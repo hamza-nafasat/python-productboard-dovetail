@@ -52,10 +52,11 @@ def render_step_setup() -> None:
         )
         anthropic_key = secret_input("Anthropic API key", "anthropic_key", cfg.get("anthropic_key", ""))
         confluence_key = secret_input(
-            "Confluence API key (or email:api_token for Cloud)",
+            "Confluence: email:API token (e.g. you@company.com:your_token)",
             "confluence_key",
             cfg.get("confluence_key", ""),
         )
+        st.caption("Required format: your Atlassian email, a colon, then your API token (no spaces).")
         st.subheader("Confluence")
         confluence_base_url = st.text_input(
             "Confluence base URL",

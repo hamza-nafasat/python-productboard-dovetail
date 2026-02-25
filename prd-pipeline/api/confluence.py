@@ -1,8 +1,8 @@
 """Confluence REST API client. Spaces, pages, create page."""
+import base64
 import logging
 import re
 from typing import Any, Optional
-from urllib.parse import urljoin
 
 import httpx
 
@@ -10,6 +10,11 @@ from api.base import create_client
 from app.config import HTTP_TIMEOUT
 
 logger = logging.getLogger(__name__)
+
+# Confluence Cloud requires Basic auth with email:API_token (see Atlassian docs).
+CONFLUENCE_AUTH_HELP = (
+    "Confluence Cloud requires your email and API token in one field: email@example.com:YOUR_API_TOKEN"
+)
 
 
 def _base_url(base: str) -> str:
@@ -19,36 +24,38 @@ def _base_url(base: str) -> str:
     return base
 
 
+def _confluence_headers(api_key: str) -> tuple[dict[str, str] | None, str | None]:
+    """
+    Build Basic auth headers for Confluence Cloud.
+    Returns (headers, None) on success, or (None, error_message) if api_key is not in email:token format.
+    """
+    auth = (api_key or "").strip()
+    if not auth:
+        return None, "Confluence API key is required"
+    if ":" not in auth:
+        return None, CONFLUENCE_AUTH_HELP
+    auth_b64 = base64.b64encode(auth.encode()).decode()
+    return {"Authorization": f"Basic {auth_b64}"}, None
+
+
 def test_connection(base_url: str, api_key: str, space_key: Optional[str] = None) -> tuple[bool, str]:
     """
-    Test Confluence: get current user or space.
-    For Cloud: use API token as basic auth (email:token). base_url e.g. https://your-domain.atlassian.net/wiki
+    Test Confluence. base_url e.g. https://your-domain.atlassian.net/wiki
+    api_key must be email:API_TOKEN (Confluence Cloud requirement).
     Returns (success, error_message).
     """
-    if not base_url or not api_key or not api_key.strip():
-        return False, "Base URL and API key are required"
+    if not (base_url or "").strip():
+        return False, "Confluence base URL is required"
+    headers, err = _confluence_headers(api_key)
+    if err:
+        return False, err
     base = _base_url(base_url)
-    # Confluence Cloud: often uses email:api_token for Basic auth
     try:
         with create_client(timeout=HTTP_TIMEOUT) as client:
-            # Try /rest/api/user/current or /rest/api/space
-            url = f"{base}/rest/api/user/current"
-            # Assume API key might be "email:token" or just token
-            auth = api_key.strip()
-            if ":" not in auth:
-                # Cloud often needs email:api_token; if only token, try as Bearer (if supported) or Basic
-                import base64
-                auth_b64 = base64.b64encode(f"{auth}:{auth}".encode()).decode()  # noqa: placeholder
-                headers = {"Authorization": f"Basic {auth_b64}"}
-            else:
-                import base64
-                auth_b64 = base64.b64encode(auth.encode()).decode()
-                headers = {"Authorization": f"Basic {auth_b64}"}
-            r = client.get(url, headers=headers)
+            r = client.get(f"{base}/rest/api/user/current", headers=headers)
             r.raise_for_status()
         return True, ""
     except httpx.HTTPStatusError as e:
-        # 401/403 common for bad auth
         msg = f"HTTP {e.response.status_code}"
         try:
             body = e.response.json()
@@ -63,17 +70,11 @@ def test_connection(base_url: str, api_key: str, space_key: Optional[str] = None
 
 def get_spaces(base_url: str, api_key: str) -> list[dict[str, Any]]:
     """Fetch spaces. Returns list of space dicts with key, name."""
-    base = _base_url(base_url)
-    if not api_key or not api_key.strip():
+    headers, _ = _confluence_headers(api_key)
+    if not headers:
         return []
+    base = _base_url(base_url)
     try:
-        auth = api_key.strip()
-        import base64
-        if ":" in auth:
-            auth_b64 = base64.b64encode(auth.encode()).decode()
-        else:
-            auth_b64 = base64.b64encode(f"{auth}:{auth}".encode()).decode()
-        headers = {"Authorization": f"Basic {auth_b64}"}
         with create_client(timeout=HTTP_TIMEOUT) as client:
             r = client.get(
                 f"{base}/rest/api/space",
@@ -94,17 +95,11 @@ def get_spaces(base_url: str, api_key: str) -> list[dict[str, Any]]:
 
 def get_pages(base_url: str, api_key: str, space_key: str) -> list[dict[str, Any]]:
     """Fetch pages in a space. Returns list with id, title, etc."""
-    base = _base_url(base_url)
-    if not api_key or not api_key.strip() or not space_key:
+    headers, _ = _confluence_headers(api_key)
+    if not headers or not space_key:
         return []
+    base = _base_url(base_url)
     try:
-        auth = api_key.strip()
-        import base64
-        if ":" in auth:
-            auth_b64 = base64.b64encode(auth.encode()).decode()
-        else:
-            auth_b64 = base64.b64encode(f"{auth}:{auth}".encode()).decode()
-        headers = {"Authorization": f"Basic {auth_b64}"}
         with create_client(timeout=HTTP_TIMEOUT) as client:
             r = client.get(
                 f"{base}/rest/api/content",
@@ -175,17 +170,11 @@ def create_page(
     """
     Create a Confluence page. Returns created page dict with id, _links.webui, etc.
     """
+    headers, _ = _confluence_headers(api_key)
+    if not headers:
+        raise ValueError(CONFLUENCE_AUTH_HELP)
     base = _base_url(base_url)
-    auth = api_key.strip()
-    import base64
-    if ":" in auth:
-        auth_b64 = base64.b64encode(auth.encode()).decode()
-    else:
-        auth_b64 = base64.b64encode(f"{auth}:{auth}".encode()).decode()
-    headers = {
-        "Authorization": f"Basic {auth_b64}",
-        "Content-Type": "application/json",
-    }
+    headers = {**headers, "Content-Type": "application/json"}
     payload = {
         "type": "page",
         "title": title,
