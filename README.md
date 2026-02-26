@@ -13,7 +13,7 @@ A **Streamlit** app that helps product managers build **Product Requirements Doc
 5. **Use the prompt elsewhere** – You copy that prompt into your preferred AI tool to get the actual PRD.
 6. **Review & publish** – You paste the PRD back into the app to edit, compare versions, and optionally publish to Confluence.
 
-So: **this app builds the prompt and manages the workflow; it does not call an LLM itself.**
+So: **this app builds the prompt and manages the workflow; it does not call an LLM itself.** For a detailed explanation of how the prompt is built (which steps, which inputs, and the final structure), see **[PROMPT_BUILDING.md](PROMPT_BUILDING.md)**.
 
 ---
 
