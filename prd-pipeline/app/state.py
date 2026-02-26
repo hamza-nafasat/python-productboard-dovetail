@@ -47,6 +47,7 @@ def init_session_state() -> None:
         "generation_running": False,
         "generated_prompt": "",
         "generated_prompt_metadata": {},
+        "generation_prompt_config_snapshot": None,  # prompt config used for current run (persists on step 4 when widget keys are not rendered)
         "current_prd_text": "",
         "current_prd_version": 1,
         "pipeline_run_id": None,

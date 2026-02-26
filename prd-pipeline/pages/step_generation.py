@@ -69,6 +69,11 @@ def _run(payload: dict[str, Any]) -> None:
         _generation_done.append(True)
 
 
+def _get_prompt_config_snapshot() -> dict[str, Any]:
+    """Prompt config used for this run; survives step 4 because it's not widget-bound."""
+    return st.session_state.get("generation_prompt_config_snapshot") or {}
+
+
 def render_step_generation() -> None:
     st.header("Step 4: Generate PRD prompt")
     st.caption(
@@ -76,15 +81,21 @@ def render_step_generation() -> None:
         "Copy the prompt into your own AI tool to generate the PRD."
     )
 
+    # Use snapshot if present (config survives here; step 3 widgets are not rendered so their keys can be removed)
+    snapshot = _get_prompt_config_snapshot()
+    product_context_display = snapshot.get("product_context") if snapshot else st.session_state.get("product_context", "")
+    business_goals_display = snapshot.get("business_goals") if snapshot else st.session_state.get("business_goals", "")
+    constraints_display = snapshot.get("constraints") if snapshot else st.session_state.get("constraints", "")
+
     # Show current prompt configuration so users can see exactly what
     # will be fed into the prompt builder before generation.
     with st.expander("Current prompt configuration", expanded=False):
         st.markdown("**Product context**")
-        st.write(st.session_state.get("product_context", "") or "(empty)")
+        st.write(product_context_display or "(empty)")
         st.markdown("**Business goals**")
-        st.write(st.session_state.get("business_goals", "") or "(empty)")
+        st.write(business_goals_display or "(empty)")
         st.markdown("**Constraints**")
-        st.write(st.session_state.get("constraints", "") or "(empty)")
+        st.write(constraints_display or "(empty)")
 
     # Sync session state from worker
     if _generation_logs:
@@ -115,6 +126,15 @@ def render_step_generation() -> None:
             "selected_dovetail_project_ids": st.session_state.get("selected_dovetail_project_ids", []),
             "selected_productboard_ids": st.session_state.get("selected_productboard_ids", []),
         }
+        st.session_state.generation_prompt_config_snapshot = {
+            "prd_template_id": payload.get("prd_template_id", "default"),
+            "product_context": payload.get("product_context", ""),
+            "business_goals": payload.get("business_goals", ""),
+            "constraints": payload.get("constraints", ""),
+            "audience_type": payload.get("audience_type", "internal_stakeholders"),
+            "output_tone": payload.get("output_tone", "professional"),
+            "include_roadmap": payload.get("include_roadmap", True),
+        }
         st.session_state.generation_running = True
         st.session_state.generation_logs = []
         st.session_state.generation_error = None
@@ -134,10 +154,8 @@ def render_step_generation() -> None:
     if running:
         st.info("Generating prompt… Fetching data and building prompt. Click **Refresh status** to update.")
         if st.button("Refresh status", key="refresh_gen"):
-            # Preserve prompt config so "Current prompt configuration" never resets on refresh
-            _saved_context = st.session_state.get("product_context", "")
-            _saved_goals = st.session_state.get("business_goals", "")
-            _saved_constraints = st.session_state.get("constraints", "")
+            # Restore prompt config from snapshot (session state keys can be removed when step 3 widgets aren't rendered)
+            snapshot = _get_prompt_config_snapshot()
             if _generation_logs:
                 st.session_state.generation_logs = list(_generation_logs)
             if _generation_error:
@@ -150,9 +168,14 @@ def render_step_generation() -> None:
                     st.session_state.generated_prompt_metadata = _generation_metadata[-1] if _generation_metadata else {}
                 if _generation_run_id:
                     st.session_state.pipeline_run_id = _generation_run_id[-1]
-            st.session_state.product_context = _saved_context
-            st.session_state.business_goals = _saved_goals
-            st.session_state.constraints = _saved_constraints
+            if snapshot:
+                st.session_state.product_context = snapshot.get("product_context", "")
+                st.session_state.business_goals = snapshot.get("business_goals", "")
+                st.session_state.constraints = snapshot.get("constraints", "")
+                st.session_state.prd_template_id = snapshot.get("prd_template_id", "default")
+                st.session_state.audience_type = snapshot.get("audience_type", "internal_stakeholders")
+                st.session_state.output_tone = snapshot.get("output_tone", "professional")
+                st.session_state.include_roadmap = snapshot.get("include_roadmap", True)
             st.rerun()
 
     if err:
