@@ -75,5 +75,16 @@ def render_step_prompt_config() -> None:
 
     st.divider()
     if st.button("Next: Generate PRD prompt →", type="primary"):
+        # Save prompt config to snapshot before leaving step 3; on step 4 the widget keys
+        # are not rendered so Streamlit removes them—we need this copy to build the payload and display.
+        st.session_state.generation_prompt_config_snapshot = {
+            "prd_template_id": st.session_state.get("prd_template_id", "default"),
+            "product_context": st.session_state.get("product_context", ""),
+            "business_goals": st.session_state.get("business_goals", ""),
+            "constraints": st.session_state.get("constraints", ""),
+            "audience_type": st.session_state.get("audience_type", "internal_stakeholders"),
+            "output_tone": st.session_state.get("output_tone", "professional"),
+            "include_roadmap": st.session_state.get("include_roadmap", True),
+        }
         next_step()
         st.rerun()

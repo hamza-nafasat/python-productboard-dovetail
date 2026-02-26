@@ -114,27 +114,44 @@ def render_step_generation() -> None:
     has_result = bool(prompt_text)
 
     if st.button("Generate PRD prompt", type="primary", key="gen_btn", disabled=running):
-        payload = {
-            "api_config": get_api_config(),
-            "prd_template_id": st.session_state.get("prd_template_id", "default"),
-            "product_context": st.session_state.get("product_context", ""),
-            "business_goals": st.session_state.get("business_goals", ""),
-            "constraints": st.session_state.get("constraints", ""),
-            "audience_type": st.session_state.get("audience_type", "internal_stakeholders"),
-            "output_tone": st.session_state.get("output_tone", "professional"),
-            "include_roadmap": st.session_state.get("include_roadmap", True),
-            "selected_dovetail_project_ids": st.session_state.get("selected_dovetail_project_ids", []),
-            "selected_productboard_ids": st.session_state.get("selected_productboard_ids", []),
-        }
-        st.session_state.generation_prompt_config_snapshot = {
-            "prd_template_id": payload.get("prd_template_id", "default"),
-            "product_context": payload.get("product_context", ""),
-            "business_goals": payload.get("business_goals", ""),
-            "constraints": payload.get("constraints", ""),
-            "audience_type": payload.get("audience_type", "internal_stakeholders"),
-            "output_tone": payload.get("output_tone", "professional"),
-            "include_roadmap": payload.get("include_roadmap", True),
-        }
+        # Use snapshot for prompt config when present (set when leaving step 3); on step 4
+        # session state may have lost widget keys so reading from session would be empty.
+        snap = _get_prompt_config_snapshot()
+        if snap:
+            payload = {
+                "api_config": get_api_config(),
+                "prd_template_id": snap.get("prd_template_id", "default"),
+                "product_context": snap.get("product_context", ""),
+                "business_goals": snap.get("business_goals", ""),
+                "constraints": snap.get("constraints", ""),
+                "audience_type": snap.get("audience_type", "internal_stakeholders"),
+                "output_tone": snap.get("output_tone", "professional"),
+                "include_roadmap": snap.get("include_roadmap", True),
+                "selected_dovetail_project_ids": st.session_state.get("selected_dovetail_project_ids", []),
+                "selected_productboard_ids": st.session_state.get("selected_productboard_ids", []),
+            }
+        else:
+            payload = {
+                "api_config": get_api_config(),
+                "prd_template_id": st.session_state.get("prd_template_id", "default"),
+                "product_context": st.session_state.get("product_context", ""),
+                "business_goals": st.session_state.get("business_goals", ""),
+                "constraints": st.session_state.get("constraints", ""),
+                "audience_type": st.session_state.get("audience_type", "internal_stakeholders"),
+                "output_tone": st.session_state.get("output_tone", "professional"),
+                "include_roadmap": st.session_state.get("include_roadmap", True),
+                "selected_dovetail_project_ids": st.session_state.get("selected_dovetail_project_ids", []),
+                "selected_productboard_ids": st.session_state.get("selected_productboard_ids", []),
+            }
+            st.session_state.generation_prompt_config_snapshot = {
+                "prd_template_id": payload.get("prd_template_id", "default"),
+                "product_context": payload.get("product_context", ""),
+                "business_goals": payload.get("business_goals", ""),
+                "constraints": payload.get("constraints", ""),
+                "audience_type": payload.get("audience_type", "internal_stakeholders"),
+                "output_tone": payload.get("output_tone", "professional"),
+                "include_roadmap": payload.get("include_roadmap", True),
+            }
         st.session_state.generation_running = True
         st.session_state.generation_logs = []
         st.session_state.generation_error = None
