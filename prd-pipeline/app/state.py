@@ -31,7 +31,7 @@ def init_session_state() -> None:
         "selected_productboard_ids": [],  # features or notes IDs
         "filters": {"tags": [], "date_from": "", "date_to": "", "priority": ""},
         "dovetail_projects": [],
-        "productboard_items": [],
+        "productboard_items": {},  # dict: {"features": [...], "notes": [...]}
         "data_sources_loaded": False,
         # Prompt config
         "prd_template_id": "default",

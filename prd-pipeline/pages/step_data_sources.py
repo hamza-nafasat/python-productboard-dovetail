@@ -78,7 +78,9 @@ def render_step_data_sources() -> None:
             st.session_state.data_sources_loaded = True
             st.rerun()
 
-        data = st.session_state.get("productboard_items", {})
+        # productboard_items is a dict {"features": [...], "notes": [...]}; state default is [] so guard against list
+        raw = st.session_state.get("productboard_items", {})
+        data = raw if isinstance(raw, dict) else {}
         features = data.get("features", [])
         notes = data.get("notes", [])
         if features or notes:
