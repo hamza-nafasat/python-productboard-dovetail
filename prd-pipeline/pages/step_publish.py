@@ -82,6 +82,4 @@ def render_step_publish() -> None:
                     st.error(str(e))
 
     st.divider()
-    if st.button("Next: History & Audit →", type="primary"):
-        next_step()
-        st.rerun()
+    st.caption("This is the final step. Once published, you can manage the page in Confluence.")

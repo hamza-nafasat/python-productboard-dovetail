@@ -15,7 +15,7 @@ LOGS_DIR.mkdir(parents=True, exist_ok=True)
 TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
 
 # Wizard
-TOTAL_STEPS = 7
+TOTAL_STEPS = 6
 STEP_NAMES = [
     "Setup",
     "Data Sources",
@@ -23,7 +23,6 @@ STEP_NAMES = [
     "Generate PRD prompt",
     "PRD Review",
     "Publish to Confluence",
-    "History & Audit",
 ]
 
 # API defaults (timeouts, retries)
