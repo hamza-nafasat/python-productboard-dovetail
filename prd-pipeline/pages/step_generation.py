@@ -134,6 +134,10 @@ def render_step_generation() -> None:
     if running:
         st.info("Generating prompt… Fetching data and building prompt. Click **Refresh status** to update.")
         if st.button("Refresh status", key="refresh_gen"):
+            # Preserve prompt config so "Current prompt configuration" never resets on refresh
+            _saved_context = st.session_state.get("product_context", "")
+            _saved_goals = st.session_state.get("business_goals", "")
+            _saved_constraints = st.session_state.get("constraints", "")
             if _generation_logs:
                 st.session_state.generation_logs = list(_generation_logs)
             if _generation_error:
@@ -146,6 +150,9 @@ def render_step_generation() -> None:
                     st.session_state.generated_prompt_metadata = _generation_metadata[-1] if _generation_metadata else {}
                 if _generation_run_id:
                     st.session_state.pipeline_run_id = _generation_run_id[-1]
+            st.session_state.product_context = _saved_context
+            st.session_state.business_goals = _saved_goals
+            st.session_state.constraints = _saved_constraints
             st.rerun()
 
     if err:
