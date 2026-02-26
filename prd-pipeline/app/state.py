@@ -61,6 +61,26 @@ def init_session_state() -> None:
         if key not in st.session_state:
             st.session_state[key] = value
 
+    # Optional: prefill API config from Streamlit Cloud secrets if present.
+    # This keeps keys in Streamlit secrets and avoids retyping them on each session.
+    try:
+        secrets = st.secrets  # type: ignore[attr-defined]
+    except Exception:
+        secrets = {}
+    if secrets:
+        api_cfg = st.session_state.get("api_config", {})
+        if not api_cfg.get("dovetail_key") and "DOVETAIL_API_KEY" in secrets:
+            api_cfg["dovetail_key"] = str(secrets.get("DOVETAIL_API_KEY") or "")
+        if not api_cfg.get("productboard_key") and "PRODUCTBOARD_API_KEY" in secrets:
+            api_cfg["productboard_key"] = str(secrets.get("PRODUCTBOARD_API_KEY") or "")
+        if not api_cfg.get("confluence_key") and "CONFLUENCE_API_KEY" in secrets:
+            api_cfg["confluence_key"] = str(secrets.get("CONFLUENCE_API_KEY") or "")
+        if not api_cfg.get("confluence_base_url") and "CONFLUENCE_BASE_URL" in secrets:
+            api_cfg["confluence_base_url"] = str(secrets.get("CONFLUENCE_BASE_URL") or "")
+        if not api_cfg.get("confluence_space") and "CONFLUENCE_SPACE" in secrets:
+            api_cfg["confluence_space"] = str(secrets.get("CONFLUENCE_SPACE") or "")
+        st.session_state.api_config = api_cfg
+
 
 def get_api_config() -> dict[str, str]:
     """Return current API config from session state."""
