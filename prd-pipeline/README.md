@@ -1,20 +1,25 @@
-# Automated PRD Generation Pipeline
+# PRD Pipeline (Streamlit app)
 
-A production-ready Streamlit application for enterprise product managers. It integrates **Dovetail**, **Productboard**, **Anthropic Claude**, and **Confluence** to generate, review, and publish Product Requirements Documents (PRDs) through a multi-step wizard.
+This folder is the main **PRD Generation Pipeline** app. For a full **project overview** (libraries, flow, structure), see the root **[README.md](../README.md)** in the repo.
 
-## Features
+---
 
-- **Step 1 – Setup**: API configuration (Dovetail, Productboard, Anthropic, Confluence) with test connection and status indicators
-- **Step 2 – Data sources**: Select Dovetail projects and Productboard areas with filters (tags, date range, priority)
-- **Step 3 – Prompt config**: PRD template, product context, business goals, constraints, audience, tone, roadmap option
-- **Step 4 – PRD generation**: Async pipeline with progress, logs, and retry
-- **Step 5 – PRD review**: Markdown editor, side-by-side preview, section regeneration, version comparison
-- **Step 6 – Publish**: Publish to Confluence (title, parent page, space, preview)
-- **Step 7 – History**: Local audit of generated PRDs with metadata and export
+## What this app does
+
+- **Step 1 – Setup**: Enter Dovetail, Productboard, and Confluence API keys; test connections.
+- **Step 2 – Data sources**: Select which Dovetail projects and Productboard features/notes to use.
+- **Step 3 – Prompt config**: Set product context, business goals, constraints, audience, tone, and roadmap option. Config is saved when you go to Step 4 so it stays visible after “Refresh status”.
+- **Step 4 – Generate PRD prompt**: Runs a pipeline that fetches your selected data, builds one combined prompt (your config + Dovetail summary + Productboard summary). You click “Refresh status” when done, then **copy the prompt into your own AI tool** (e.g. ChatGPT, Claude) to generate the PRD. The app does not call an LLM.
+- **Step 5 – PRD review**: Paste the PRD from your AI tool, edit in the app, compare versions.
+- **Step 6 – Publish**: Publish the current PRD to Confluence (parent page, title, space).
+
+History is available from the sidebar (local JSON store).
+
+---
 
 ## Setup
 
-1. **Clone and enter the project**
+1. **Go to this directory**
    ```bash
    cd prd-pipeline
    ```
@@ -29,12 +34,15 @@ A production-ready Streamlit application for enterprise product managers. It int
    pip install -r requirements.txt
    ```
 
-3. **Environment variables (optional)**  
-   Copy `.env.example` to `.env` and fill in API keys for local development. The app prioritizes keys entered manually in the UI (session state).
+3. **Environment (optional)**  
+   - Copy `.env.example` to `.env` and add API keys for local dev; the app can prefill from them.
+   - Or use Streamlit secrets (e.g. `.streamlit/secrets.toml`). If no secrets file exists, the app still runs; you enter keys in Step 1.
+
+---
 
 ## Run
 
-**Option A – Use the run script (creates venv if missing, installs deps, starts app)**
+**Option A – Run script (creates venv if missing, installs deps, starts app)**
 
 ```bash
 # Linux/macOS
@@ -46,29 +54,39 @@ run.bat
 
 **Option B – Manual (with venv already activated)**
 
-From the project root:
+From **prd-pipeline**:
 
 ```bash
 streamlit run app/main.py
 ```
 
-Then open the URL shown in the terminal (default: http://localhost:8501).
+Then open the URL shown (default: http://localhost:8501).
 
-## Project structure
+---
 
-- `app/` – Entry point, config, session state, async runner
-- `api/` – API clients (Dovetail, Productboard, Anthropic, Confluence)
-- `core/` – PRD generator, prompts, data models
-- `services/` – History store (local JSON)
-- `ui/` – Sidebar, layout, theme
-- `components/` – Reusable UI (connection status, loading, forms, data preview, markdown editor)
-- `pages/` – Wizard steps 1–7
-- `templates/` – PRD templates
+## Project structure (this folder)
+
+| Path | Purpose |
+|------|--------|
+| `app/` | Entry point (`main.py`), config, session state, optional API server |
+| `api/` | Dovetail, Productboard, Confluence API clients |
+| `core/` | Data models, `run_pipeline()` (fetch + summarize + build prompt) |
+| `services/prompt_builder/` | Prompt assembly (strategies, normalizer, config) |
+| `services/history.py` | Local PRD history (JSON) |
+| `pages/` | Wizard steps 1–6 (one file per step) |
+| `ui/` | Sidebar, theme, layout |
+| `components/` | Connection status, forms, markdown editor, etc. |
+| `data/`, `logs/` | Created at runtime |
+| `scripts/` | e.g. `verify_prompt_build.py` to check prompt content |
+
+---
 
 ## Deployment (e.g. Streamlit Cloud)
 
-- Set environment variables in the cloud dashboard for API keys if you want to prefill (optional).
+- Set environment variables or Streamlit secrets for API keys if you want prefilled values (optional).
 - Do not commit `.env` or any file containing API keys.
+
+---
 
 ## License
 
