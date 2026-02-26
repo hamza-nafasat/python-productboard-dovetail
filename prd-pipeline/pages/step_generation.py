@@ -76,6 +76,16 @@ def render_step_generation() -> None:
         "Copy the prompt into your own AI tool to generate the PRD."
     )
 
+    # Show current prompt configuration so users can see exactly what
+    # will be fed into the prompt builder before generation.
+    with st.expander("Current prompt configuration", expanded=False):
+        st.markdown("**Product context**")
+        st.write(st.session_state.get("product_context", "") or "(empty)")
+        st.markdown("**Business goals**")
+        st.write(st.session_state.get("business_goals", "") or "(empty)")
+        st.markdown("**Constraints**")
+        st.write(st.session_state.get("constraints", "") or "(empty)")
+
     # Sync session state from worker
     if _generation_logs:
         st.session_state.generation_logs = list(_generation_logs)
