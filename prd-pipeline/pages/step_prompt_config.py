@@ -66,6 +66,6 @@ def render_step_prompt_config() -> None:
     st.session_state.include_roadmap = include_roadmap
 
     st.divider()
-    if st.button("Next: PRD Generation →", type="primary"):
+    if st.button("Next: Generate PRD prompt →", type="primary"):
         next_step()
         st.rerun()

@@ -15,7 +15,6 @@ def init_session_state() -> None:
         "api_config": {
             "dovetail_key": "",
             "productboard_key": "",
-            "anthropic_key": "",
             "confluence_key": "",
             "confluence_base_url": "",
             "confluence_space": "",
@@ -42,10 +41,12 @@ def init_session_state() -> None:
         "audience_type": "internal_stakeholders",
         "output_tone": "professional",
         "include_roadmap": True,
-        # Generation
+        # Generation (prompt only; PRD comes from user's AI tool)
         "generation_logs": [],
         "generation_error": None,
         "generation_running": False,
+        "generated_prompt": "",
+        "generated_prompt_metadata": {},
         "current_prd_text": "",
         "current_prd_version": 1,
         "pipeline_run_id": None,

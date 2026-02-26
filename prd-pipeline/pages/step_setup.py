@@ -4,11 +4,9 @@ import logging
 import streamlit as st
 
 from api import confluence, dovetail, productboard
-from api.anthropic_client import test_connection as anthropic_test
-from app.run_async import run_async
 from app.state import get_api_config, next_step
 from components.connection_status import render_status_grid
-from components.forms import secret_input, test_button
+from components.forms import secret_input
 from core.models import APIConfig
 
 logger = logging.getLogger(__name__)
@@ -22,11 +20,6 @@ def _test_dovetail() -> tuple[bool, str]:
 def _test_productboard() -> tuple[bool, str]:
     cfg = get_api_config()
     return productboard.test_connection(cfg.get("productboard_key", ""))
-
-
-def _test_anthropic() -> tuple[bool, str]:
-    cfg = get_api_config()
-    return run_async(anthropic_test(cfg.get("anthropic_key", "")))
 
 
 def _test_confluence() -> tuple[bool, str]:
@@ -50,7 +43,6 @@ def render_step_setup() -> None:
         productboard_key = secret_input(
             "Productboard API key", "productboard_key", cfg.get("productboard_key", "")
         )
-        anthropic_key = secret_input("Anthropic API key", "anthropic_key", cfg.get("anthropic_key", ""))
         confluence_key = secret_input(
             "Confluence: email:API token (e.g. you@company.com:your_token)",
             "confluence_key",
@@ -76,7 +68,6 @@ def render_step_setup() -> None:
             st.session_state.api_config = {
                 "dovetail_key": dovetail_key,
                 "productboard_key": productboard_key,
-                "anthropic_key": anthropic_key,
                 "confluence_key": confluence_key,
                 "confluence_base_url": confluence_base_url.strip(),
                 "confluence_space": confluence_space.strip(),
@@ -105,15 +96,6 @@ def render_step_setup() -> None:
                 ok, err = _test_productboard()
             status["productboard"] = ok
             errors["productboard"] = err
-            st.session_state.connection_status = status
-            st.session_state.connection_errors = errors
-            st.success("Connected.") if ok else st.error(err)
-            st.rerun()
-        if st.button("Test Anthropic", key="test_anthropic_btn"):
-            with st.spinner("Testing Anthropic..."):
-                ok, err = _test_anthropic()
-            status["anthropic"] = ok
-            errors["anthropic"] = err
             st.session_state.connection_status = status
             st.session_state.connection_errors = errors
             st.success("Connected.") if ok else st.error(err)

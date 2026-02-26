@@ -1,6 +1,7 @@
 """
-Orchestrates: fetch data from Dovetail/Productboard -> build prompt -> call Claude -> return PRD.
+Orchestrates: fetch data from Dovetail/Productboard -> build prompt via prompt_builder -> return prompt + metadata.
 Designed to run in a thread; logs and errors are stored for the UI to read.
+No AI execution; the prompt is for users to run in their own LLM tools.
 """
 from __future__ import annotations
 
@@ -9,7 +10,8 @@ import uuid
 from typing import Any, Callable, Optional
 
 from core.models import APIConfig, PromptConfig
-from core.prompts import build_prd_prompt
+from services.prompt_builder import build_prompt_from_summaries
+from services.prompt_builder.models import PromptBuilderConfig, PromptResult
 
 logger = logging.getLogger(__name__)
 
@@ -51,12 +53,14 @@ def run_pipeline(
     selected_dovetail_project_ids: list[str],
     selected_productboard_ids: list[str],
     log_callback: Optional[Callable[[str], None]] = None,
-) -> tuple[str, Optional[str], str]:
+) -> tuple[str, Optional[str], str, Optional[dict[str, Any]]]:
     """
-    Run the full PRD generation pipeline (sync). Call from a thread.
-    Returns (prd_text, error_message, run_id). If error_message is set, prd_text may be empty.
+    Run the prompt generation pipeline (sync). Call from a thread.
+    Returns (prompt_text, error_message, run_id, metadata).
+    If error_message is set, prompt_text may be empty and metadata None.
     """
     run_id = str(uuid.uuid4())[:8]
+
     def log(msg: str) -> None:
         logger.info("[%s] %s", run_id, msg)
         if log_callback:
@@ -65,19 +69,17 @@ def run_pipeline(
     log("Starting pipeline.")
     try:
         from api import dovetail, productboard
-        from api.anthropic_client import generate_prd
-        from app.run_async import run_async
     except ImportError as e:
         err = f"Import error: {e}"
         log(err)
-        return "", err, run_id
+        return "", err, run_id, None
 
     # 1. Fetch Dovetail data
     log("Fetching Dovetail projects and insights...")
     projects = dovetail.get_projects(api_config.dovetail_key)
     projects_subset = [p for p in projects if str(p.get("id", "")) in selected_dovetail_project_ids]
     if not selected_dovetail_project_ids:
-        projects_subset = projects[:5]  # use first 5 if none selected
+        projects_subset = projects[:5]
     insights: list[dict[str, Any]] = []
     for p in projects_subset:
         pid = p.get("id")
@@ -99,23 +101,27 @@ def run_pipeline(
     productboard_summary = _summarize_productboard(features, notes)
     log(f"Productboard: {len(features)} features, {len(notes)} notes.")
 
-    # 3. Build prompt
+    # 3. Build prompt via prompt_builder (no AI call)
     log("Building prompt...")
-    prompt = build_prd_prompt(prompt_config, dovetail_summary, productboard_summary)
-
-    # 4. Call Claude (async run from sync)
-    log("Calling Claude...")
     try:
-        prd_text = run_async(
-            generate_prd(
-                prompt=prompt,
-                api_key=api_config.anthropic_key,
-            )
+        builder_config = PromptBuilderConfig(
+            prd_template_id=prompt_config.prd_template_id,
+            product_context=prompt_config.product_context or "",
+            business_goals=prompt_config.business_goals or "",
+            constraints=prompt_config.constraints or "",
+            audience_type=prompt_config.audience_type,
+            output_tone=prompt_config.output_tone,
+            include_roadmap=prompt_config.include_roadmap,
         )
+        result: PromptResult = build_prompt_from_summaries(
+            dovetail_summary=dovetail_summary,
+            productboard_summary=productboard_summary,
+            config=builder_config,
+        )
+        metadata = result.model_dump()
+        log("Pipeline complete.")
+        return result.prompt, None, run_id, metadata
     except Exception as e:
         err = str(e)
-        log(f"Claude error: {err}")
-        return "", err, run_id
-
-    log("Pipeline complete.")
-    return prd_text, None, run_id
+        log(f"Prompt build error: {err}")
+        return "", err, run_id, None

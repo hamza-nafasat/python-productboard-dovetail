@@ -1,11 +1,19 @@
-"""PRD prompt builder from template and user config."""
+"""
+PRD prompt builder from template and user config.
+
+DEPRECATED: New code should use services.prompt_builder (build_prompt_from_summaries)
+which provides normalization, multiple strategies, and structured metadata.
+This module is kept for backward compatibility; build_prd_prompt delegates to the new builder.
+"""
 from __future__ import annotations
 
-from typing import Any
+import warnings
 
 from core.models import PromptConfig
+from services.prompt_builder import build_prompt_from_summaries
+from services.prompt_builder.models import PromptBuilderConfig
 
-# Default template structure (placeholders filled by build_prd_prompt)
+# Legacy template constants (kept for any code that might reference them)
 DEFAULT_TEMPLATE = """# Product Requirements Document
 
 ## 1. Overview
@@ -50,49 +58,26 @@ def build_prd_prompt(
     productboard_summary: str,
 ) -> str:
     """
-    Build the full prompt sent to Claude: instructions + context + data.
-    Claude will output a complete PRD in Markdown.
+    Build a PRD generation prompt (instructions + context + data).
+    DEPRECATED: Use services.prompt_builder.build_prompt_from_summaries for new code.
     """
-    context = config.product_context or "General product."
-    goals = config.business_goals or "To be defined."
-    constraints = config.constraints or "None specified."
-    audience = config.audience_type.replace("_", " ").title()
-    tone = config.output_tone.replace("_", " ").title()
-
-    template = get_template(config.prd_template_id)
-    roadmap_block = ROADMAP_SECTION if config.include_roadmap else ""
-
-    system_instruction = f"""You are an expert product manager. Write a complete, production-ready Product Requirements Document (PRD) in Markdown.
-
-Guidelines:
-- Audience: {audience}. Use a {tone} tone.
-- Be specific and actionable. Include clear success criteria where relevant.
-- Structure with clear headings (##, ###). Use bullet lists for requirements.
-- Base the content on the research and feedback data provided below; do not invent data.
-- Output only the PRD Markdown, no meta-commentary."""
-
-    user_content = f"""Use this context to write the PRD:
-
-**Product context**
-{context}
-
-**Business goals**
-{goals}
-
-**Constraints**
-{constraints}
-
-**User research (Dovetail)**
-{dovetail_summary}
-
-**Product feedback (Productboard)**
-{productboard_summary}
-
-Generate the full PRD in Markdown. Use headings, bullets, and clear sections. Do not include a roadmap section unless the user requested it.
-"""
-    if config.include_roadmap:
-        user_content += "\nInclude a high-level Roadmap section at the end with phases/milestones.\n"
-
-    # We send one user message with the full brief; Claude generates the PRD
-    full_user = f"{system_instruction}\n\n---\n\n{user_content}"
-    return full_user
+    warnings.warn(
+        "core.prompts.build_prd_prompt is deprecated; use services.prompt_builder.build_prompt_from_summaries",
+        DeprecationWarning,
+        stacklevel=2,
+    )
+    builder_config = PromptBuilderConfig(
+        prd_template_id=config.prd_template_id,
+        product_context=config.product_context or "",
+        business_goals=config.business_goals or "",
+        constraints=config.constraints or "",
+        audience_type=config.audience_type,
+        output_tone=config.output_tone,
+        include_roadmap=config.include_roadmap,
+    )
+    result = build_prompt_from_summaries(
+        dovetail_summary=dovetail_summary,
+        productboard_summary=productboard_summary,
+        config=builder_config,
+    )
+    return result.prompt

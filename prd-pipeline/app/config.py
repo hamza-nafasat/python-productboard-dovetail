@@ -20,7 +20,7 @@ STEP_NAMES = [
     "Setup",
     "Data Sources",
     "Prompt Config",
-    "PRD Generation",
+    "Generate PRD prompt",
     "PRD Review",
     "Publish to Confluence",
     "History & Audit",
@@ -29,10 +29,6 @@ STEP_NAMES = [
 # API defaults (timeouts, retries)
 HTTP_TIMEOUT = 30.0
 HTTP_MAX_RETRIES = 2
-
-# Claude
-DEFAULT_CLAUDE_MODEL = "claude-sonnet-4-20250514"
-DEFAULT_MAX_TOKENS = 8192
 
 # Theme keys for session state
 THEME_KEY = "dark_mode"  # True = dark, False = light

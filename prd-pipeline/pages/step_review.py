@@ -1,32 +1,39 @@
-"""Step 5: PRD review - markdown editor, side-by-side preview, section regeneration."""
+"""Step 5: PRD review - markdown editor, side-by-side preview, paste from AI tool."""
 import difflib
 import logging
-from concurrent.futures import ThreadPoolExecutor
 
 import streamlit as st
 
-from api.anthropic_client import regenerate_section
-from app.run_async import run_async
-from app.state import get_api_config, next_step
-from components.markdown_editor import extract_section_by_heading, render_editor_and_preview
+from app.state import next_step
+from components.markdown_editor import render_editor_and_preview
 
 logger = logging.getLogger(__name__)
-_executor = ThreadPoolExecutor(max_workers=1)
-
-_versions: list[dict] = []  # [{version, text}, ...]
-
-
-def _regenerate_section(section: str, context: str, api_key: str) -> str:
-    return run_async(regenerate_section(section, context, api_key))
 
 
 def render_step_review() -> None:
     st.header("Step 5: PRD Review")
-    st.caption("Edit the PRD, preview live, or regenerate a section with Claude.")
+    st.caption("Paste your PRD from your AI tool, then edit and preview before publishing.")
 
     current = st.session_state.get("current_prd_text", "")
+
+    # If no content yet, offer paste-from-AI-tool
     if not current:
-        st.warning("No PRD content yet. Generate one in Step 4.")
+        st.info("Paste the PRD you generated with your AI tool below, then click **Load PRD** to edit and publish.")
+        pasted = st.text_area(
+            "Paste PRD from your AI tool",
+            value=st.session_state.get("paste_prd_input", ""),
+            height=200,
+            placeholder="Paste your full PRD markdown here...",
+            key="paste_prd_input",
+        )
+        if st.button("Load PRD", type="primary", key="load_pasted_prd"):
+            # Use session state so we have the value after the button click
+            content = st.session_state.get("paste_prd_input", "") or pasted
+            if content and str(content).strip():
+                st.session_state.current_prd_text = str(content).strip()
+                st.rerun()
+            else:
+                st.warning("Please paste some content first.")
         return
 
     # Editor and preview
@@ -38,55 +45,10 @@ def render_step_review() -> None:
     if new_text != current:
         st.session_state.current_prd_text = new_text
 
-    # Use latest text for section extraction
-    text_for_sections = st.session_state.get("current_prd_text", "")
-
-    st.divider()
-    st.subheader("Section regeneration")
-    headings = [
-        line.strip() for line in text_for_sections.split("\n")
-        if line.strip().startswith("#") and len(line.strip()) > 1
-    ]
-    if headings:
-        chosen = st.selectbox(
-            "Select section to regenerate",
-            options=headings,
-            key="section_heading",
-        )
-        if st.button("Regenerate this section", key="regen_sec"):
-            section, before, after = extract_section_by_heading(text_for_sections, chosen)
-            if section:
-                cfg = get_api_config()
-                api_key = cfg.get("anthropic_key", "")
-                if api_key:
-                    with st.spinner("Regenerating..."):
-                        context = (before or "") + "\n[...]\n" + (after or "")
-                        try:
-                            new_section = _regenerate_section(section, context, api_key)
-                            # Replace section in full text
-                            full = (before or "") + "\n" + new_section + "\n" + (after or "")
-                            if not full.strip():
-                                full = new_section
-                            st.session_state.current_prd_text = full
-                            st.session_state.current_prd_version = st.session_state.get("current_prd_version", 1) + 1
-                            st.success("Section updated.")
-                            st.rerun()
-                        except Exception as e:
-                            st.error(str(e))
-                else:
-                    st.error("Set Anthropic API key in Step 1.")
-            else:
-                st.warning("Section not found.")
-    else:
-        st.caption("No headings found for section regeneration.")
-
     # Version comparison
     if "prd_versions" not in st.session_state:
         st.session_state.prd_versions = []
     versions = st.session_state.prd_versions
-    if new_text and (not versions or versions[-1].get("text") != new_text):
-        # Optionally snapshot current as new version for comparison
-        pass  # we don't auto-snapshot on every edit; user can "Save version"
     if st.button("Save current as version snapshot", key="save_ver"):
         v = st.session_state.get("current_prd_version", 1)
         versions.append({"version": v, "text": st.session_state.current_prd_text})

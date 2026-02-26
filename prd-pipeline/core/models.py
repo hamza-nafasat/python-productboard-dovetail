@@ -10,7 +10,6 @@ class APIConfig:
     """API keys and Confluence settings (session-only)."""
     dovetail_key: str = ""
     productboard_key: str = ""
-    anthropic_key: str = ""
     confluence_key: str = ""
     confluence_base_url: str = ""
     confluence_space: str = ""
@@ -20,7 +19,6 @@ class APIConfig:
         return cls(
             dovetail_key=d.get("dovetail_key", "") or "",
             productboard_key=d.get("productboard_key", "") or "",
-            anthropic_key=d.get("anthropic_key", "") or "",
             confluence_key=d.get("confluence_key", "") or "",
             confluence_base_url=d.get("confluence_base_url", "") or "",
             confluence_space=d.get("confluence_space", "") or "",
