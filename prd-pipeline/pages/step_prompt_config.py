@@ -8,7 +8,25 @@ def render_step_prompt_config() -> None:
     st.header("Step 3: Prompt Configuration")
     st.caption("Customize how the PRD will be generated.")
 
-    # Widgets with key= update st.session_state automatically; do not assign to those keys after creation
+    # Ensure defaults exist in session state only once; widgets below
+    # will then read/write these keys automatically.
+    if "prd_template_id" not in st.session_state:
+        st.session_state.prd_template_id = "default"
+    if "product_context" not in st.session_state:
+        st.session_state.product_context = ""
+    if "business_goals" not in st.session_state:
+        st.session_state.business_goals = ""
+    if "constraints" not in st.session_state:
+        st.session_state.constraints = ""
+    if "audience_type" not in st.session_state:
+        st.session_state.audience_type = "internal_stakeholders"
+    if "output_tone" not in st.session_state:
+        st.session_state.output_tone = "professional"
+    if "include_roadmap" not in st.session_state:
+        st.session_state.include_roadmap = True
+
+    # Widgets with key= update st.session_state automatically; we avoid
+    # passing value= on every rerun so user input is not overwritten.
     st.selectbox(
         "PRD template",
         options=["default"],
@@ -18,7 +36,6 @@ def render_step_prompt_config() -> None:
 
     st.text_area(
         "Product context",
-        value=st.session_state.get("product_context", ""),
         placeholder="Brief description of the product and problem space...",
         height=120,
         key="product_context",
@@ -26,7 +43,6 @@ def render_step_prompt_config() -> None:
 
     st.text_area(
         "Business goals",
-        value=st.session_state.get("business_goals", ""),
         placeholder="What are the business objectives?",
         height=100,
         key="business_goals",
@@ -34,7 +50,6 @@ def render_step_prompt_config() -> None:
 
     st.text_area(
         "Constraints",
-        value=st.session_state.get("constraints", ""),
         placeholder="Technical, timeline, or resource constraints...",
         height=100,
         key="constraints",
@@ -55,7 +70,6 @@ def render_step_prompt_config() -> None:
 
     st.checkbox(
         "Include roadmap section",
-        value=st.session_state.get("include_roadmap", True),
         key="include_roadmap",
     )
 
