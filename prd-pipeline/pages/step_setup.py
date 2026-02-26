@@ -39,25 +39,25 @@ def render_step_setup() -> None:
 
     with st.form("api_config_form", clear_on_submit=False):
         st.subheader("API Keys")
-        dovetail_key = secret_input("Dovetail API key", "dovetail_key", cfg.get("dovetail_key", ""))
+        dovetail_key = secret_input("Dovetail API Key", "dovetail_key", cfg.get("dovetail_key", ""))
         productboard_key = secret_input(
-            "Productboard API key", "productboard_key", cfg.get("productboard_key", "")
+            "Productboard API Key", "productboard_key", cfg.get("productboard_key", "")
         )
         confluence_key = secret_input(
-            "Confluence: email:API token (e.g. you@company.com:your_token)",
+            "Confluence: Email:API Token (e.g. you@company.com:your_token)",
             "confluence_key",
             cfg.get("confluence_key", ""),
         )
         st.caption("Required format: your Atlassian email, a colon, then your API token (no spaces).")
         st.subheader("Confluence")
         confluence_base_url = st.text_input(
-            "Confluence base URL",
+            "Confluence Base URL",
             value=cfg.get("confluence_base_url", ""),
             placeholder="https://your-domain.atlassian.net/wiki",
             key="confluence_base_url",
         )
         confluence_space = st.text_input(
-            "Confluence space key",
+            "Confluence Space Key",
             value=cfg.get("confluence_space", ""),
             placeholder="PRD",
             key="confluence_space",

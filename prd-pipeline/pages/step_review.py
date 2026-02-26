@@ -20,7 +20,7 @@ def render_step_review() -> None:
     if not current:
         st.info("Paste the PRD you generated with your AI tool below, then click **Load PRD** to edit and publish.")
         pasted = st.text_area(
-            "Paste PRD from your AI tool",
+            "Paste PRD From Your AI Tool",
             value=st.session_state.get("paste_prd_input", ""),
             height=200,
             placeholder="Paste your full PRD markdown here...",
@@ -64,7 +64,7 @@ def render_step_review() -> None:
             a = versions[v1]["text"].splitlines()
             b = versions[v2]["text"].splitlines()
             diff = list(difflib.unified_diff(a, b, lineterm=""))
-            st.text_area("Diff", value="\n".join(diff), height=200, key="diff_view")
+            st.text_area("Diff View", value="\n".join(diff), height=200, key="diff_view")
 
     st.divider()
     if st.button("Next: Publish to Confluence →", type="primary"):

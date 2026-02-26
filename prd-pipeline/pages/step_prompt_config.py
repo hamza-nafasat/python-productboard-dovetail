@@ -28,21 +28,22 @@ def render_step_prompt_config() -> None:
     # Widgets with key= update st.session_state automatically; we avoid
     # passing value= on every rerun so user input is not overwritten.
     st.selectbox(
-        "PRD template",
+        "PRD Template",
         options=["default"],
+        format_func=lambda x: x.title(),
         key="prd_template_id",
         index=0,
     )
 
     st.text_area(
-        "Product context",
+        "Product Context",
         placeholder="Brief description of the product and problem space...",
         height=120,
         key="product_context",
     )
 
     st.text_area(
-        "Business goals",
+        "Business Goals",
         placeholder="What are the business objectives?",
         height=100,
         key="business_goals",
@@ -56,20 +57,21 @@ def render_step_prompt_config() -> None:
     )
 
     st.selectbox(
-        "Audience type",
+        "Audience Type",
         options=["internal_stakeholders", "executives", "engineering", "customers"],
         format_func=lambda x: x.replace("_", " ").title(),
         key="audience_type",
     )
 
     st.selectbox(
-        "Output tone",
+        "Output Tone",
         options=["professional", "concise", "detailed", "conversational"],
+        format_func=lambda x: x.title(),
         key="output_tone",
     )
 
     st.checkbox(
-        "Include roadmap section",
+        "Include Roadmap Section",
         key="include_roadmap",
     )
 

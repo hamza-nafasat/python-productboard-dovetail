@@ -89,10 +89,10 @@ def render_step_generation() -> None:
 
     # Show current prompt configuration so users can see exactly what
     # will be fed into the prompt builder before generation.
-    with st.expander("Current prompt configuration", expanded=False):
-        st.markdown("**Product context**")
+    with st.expander("Current Prompt Configuration", expanded=False):
+        st.markdown("**Product Context**")
         st.write(product_context_display or "(empty)")
-        st.markdown("**Business goals**")
+        st.markdown("**Business Goals**")
         st.write(business_goals_display or "(empty)")
         st.markdown("**Constraints**")
         st.write(constraints_display or "(empty)")
@@ -220,7 +220,7 @@ def render_step_generation() -> None:
 
         # Editable prompt: user can tweak before copying
         edited = st.text_area(
-            "PRD prompt (editable)",
+            "PRD Prompt (Editable)",
             value=prompt_text,
             height=400,
             key="generated_prompt_editor",

@@ -49,9 +49,10 @@ def render_step_data_sources() -> None:
             selected_ids_prev = st.session_state.get("selected_dovetail_project_ids", [])
             default_labels = [l for l, i in options.items() if i in selected_ids_prev]
             selected_labels = st.multiselect(
-                "Select projects",
+                "Select Projects",
                 options=list(options.keys()),
                 default=default_labels,
+                format_func=lambda x: x.title() if isinstance(x, str) else str(x),
                 key="dovetail_multiselect",
             )
             selected_ids = [options[l] for l in selected_labels]
@@ -90,9 +91,10 @@ def render_step_data_sources() -> None:
             selected_ids_prev = st.session_state.get("selected_productboard_ids", [])
             default_labels_pb = [l for l, i in options.items() if i in selected_ids_prev]
             selected_labels = st.multiselect(
-                "Select features/notes",
+                "Select Features/Notes",
                 options=list(options.keys()),
                 default=default_labels_pb,
+                format_func=lambda x: x.title() if isinstance(x, str) else str(x),
                 key="pb_multiselect",
             )
             selected_ids = [options[l] for l in selected_labels]

@@ -37,4 +37,4 @@ def render_step_history() -> None:
                     mime="text/markdown",
                     key=f"dl_{e.get('id')}",
                 )
-            st.text_area("Content preview", value=(e.get("content", ""))[:2000] + "...", height=120, disabled=True, key=f"prev_{e.get('id')}")
+            st.text_area("Content Preview", value=(e.get("content", ""))[:2000] + "...", height=120, disabled=True, key=f"prev_{e.get('id')}")

@@ -24,7 +24,7 @@ def apply_theme() -> None:
 
 def render_theme_toggle() -> None:
     """Render a toggle for dark/light mode in the sidebar."""
-    label = "Dark mode" if not st.session_state.get("dark_mode", False) else "Light mode"
+    label = "Dark Mode" if not st.session_state.get("dark_mode", False) else "Light Mode"
     if st.button(label, key="theme_toggle"):
         st.session_state.dark_mode = not st.session_state.get("dark_mode", False)
         st.rerun()

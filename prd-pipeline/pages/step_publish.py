@@ -29,7 +29,7 @@ def render_step_publish() -> None:
     # Default title from first line of PRD
     default_title = (current.split("\n")[0] or "PRD").replace("#", "").strip()
     page_title = st.text_input(
-        "Page title",
+        "Page Title",
         value=st.session_state.get("confluence_page_title", "") or default_title,
         key="publish_page_title",
     )
@@ -38,12 +38,17 @@ def render_step_publish() -> None:
     if space_key:
         st.caption(f"Space: {space_key}")
     else:
-        space_key = st.text_input("Confluence space key", value="", key="publish_space")
+        space_key = st.text_input("Confluence Space Key", value="", key="publish_space")
     pages_in_space = []
     if base_url and api_key and space_key:
         pages_in_space = confluence.get_pages(base_url, api_key, space_key)
     parent_options = ["(None - top level)"] + [f"{p.get('title', '')} ({p.get('id', '')})" for p in pages_in_space]
-    parent_choice = st.selectbox("Parent page", options=parent_options, key="parent_choice")
+    parent_choice = st.selectbox(
+        "Parent Page",
+        options=parent_options,
+        format_func=lambda x: x.title() if isinstance(x, str) else str(x),
+        key="parent_choice",
+    )
     parent_id = None
     if parent_choice and parent_choice != "(None - top level)":
         try:
