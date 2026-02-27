@@ -10,7 +10,7 @@ import uuid
 from typing import Any, Callable, Optional
 
 from core.models import APIConfig, PromptConfig
-from services.prompt_builder import build_prompt_from_summaries
+from services.prompt_builder import build_prompt
 from services.prompt_builder.models import PromptBuilderConfig, PromptResult
 
 logger = logging.getLogger(__name__)
@@ -84,7 +84,13 @@ def run_pipeline(
     for p in projects_subset:
         pid = p.get("id")
         if pid:
-            insights.extend(dovetail.get_insights(api_config.dovetail_key, project_id=str(pid)))
+            project_insights = dovetail.get_insights(api_config.dovetail_key, project_id=str(pid))
+            # Attach basic project metadata to each insight for richer context downstream.
+            project_name = p.get("name") or p.get("title") or str(p.get("id", ""))
+            for ins in project_insights:
+                ins.setdefault("project_id", p.get("id"))
+                ins.setdefault("project_name", project_name)
+            insights.extend(project_insights)
     dovetail_summary = _summarize_dovetail(projects_subset, insights)
     log(f"Dovetail: {len(projects_subset)} projects, {len(insights)} insights.")
 
@@ -101,6 +107,18 @@ def run_pipeline(
     productboard_summary = _summarize_productboard(features, notes)
     log(f"Productboard: {len(features)} features, {len(notes)} notes.")
 
+    # Prepare raw items for the prompt builder (full data path).
+    dovetail_raw: list[dict[str, Any]] = list(insights)
+    productboard_raw: list[dict[str, Any]] = []
+    for f in features:
+        f_with_kind = dict(f)
+        f_with_kind.setdefault("kind", "feature")
+        productboard_raw.append(f_with_kind)
+    for n in notes:
+        n_with_kind = dict(n)
+        n_with_kind.setdefault("kind", "note")
+        productboard_raw.append(n_with_kind)
+
     # 3. Build prompt via prompt_builder (no AI call)
     log("Building prompt...")
     try:
@@ -113,12 +131,15 @@ def run_pipeline(
             output_tone=prompt_config.output_tone,
             include_roadmap=prompt_config.include_roadmap,
         )
-        result: PromptResult = build_prompt_from_summaries(
-            dovetail_summary=dovetail_summary,
-            productboard_summary=productboard_summary,
+        result: PromptResult = build_prompt(
+            dovetail_raw=dovetail_raw,
+            productboard_raw=productboard_raw,
             config=builder_config,
         )
         metadata = result.model_dump()
+        # Attach short human-readable previews for debugging/inspection only.
+        metadata.setdefault("dovetail_summary_preview", dovetail_summary)
+        metadata.setdefault("productboard_summary_preview", productboard_summary)
         log("Pipeline complete.")
         return result.prompt, None, run_id, metadata
     except Exception as e:

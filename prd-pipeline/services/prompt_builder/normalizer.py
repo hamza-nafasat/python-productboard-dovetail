@@ -38,8 +38,8 @@ def _content_hash(item: dict[str, Any], keys: list[str]) -> str:
 def normalize_insights(
     raw: list[dict[str, Any]],
     *,
-    max_items: int = 50,
-    body_max_len: int = 500,
+    max_items: int = 30,
+    body_max_len: int = 800,
     title_max_len: int = 200,
 ) -> NormalizedInsights:
     """
@@ -79,8 +79,8 @@ def normalize_insights(
 def normalize_feedback(
     raw: list[dict[str, Any]],
     *,
-    max_items: int = 30,
-    content_max_len: int = 300,
+    max_items: int = 20,
+    content_max_len: int = 600,
     title_max_len: int = 200,
 ) -> NormalizedFeedback:
     """
