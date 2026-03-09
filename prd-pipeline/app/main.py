@@ -72,12 +72,6 @@ try:
     elif step == 4:
         from pages.step_generation import render_step_generation
         render_step_generation()
-    elif step == 5:
-        from pages.step_history import render_step_history
-        render_step_history()
-    else:
-        from pages.step_history import render_step_history
-        render_step_history()
 except Exception as e:
     logger.exception("Page error: %s", e)
     st.error("Something went wrong. Please try again or go back to Setup.")

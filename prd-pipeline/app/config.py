@@ -15,13 +15,12 @@ LOGS_DIR.mkdir(parents=True, exist_ok=True)
 TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
 
 # Wizard
-TOTAL_STEPS = 5
+TOTAL_STEPS = 4
 STEP_NAMES = [
     "Setup",
     "Data Sources",
     "Prompt Config",
     "Generate PRD prompt",
-    "History & Audit",
 ]
 
 # API defaults (timeouts, retries)

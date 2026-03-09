@@ -51,6 +51,7 @@ def run_pipeline(
     api_config: APIConfig,
     prompt_config: PromptConfig,
     selected_dovetail_project_ids: list[str],
+    selected_dovetail_insight_ids: list[str],
     selected_productboard_ids: list[str],
     log_callback: Optional[Callable[[str], None]] = None,
 ) -> tuple[str, Optional[str], str, Optional[dict[str, Any]]]:
@@ -91,6 +92,8 @@ def run_pipeline(
                 ins.setdefault("project_id", p.get("id"))
                 ins.setdefault("project_name", project_name)
             insights.extend(project_insights)
+    if selected_dovetail_insight_ids:
+        insights = [i for i in insights if str(i.get("id", "")) in selected_dovetail_insight_ids]
     dovetail_summary = _summarize_dovetail(projects_subset, insights)
     log(f"Dovetail: {len(projects_subset)} projects, {len(insights)} insights.")
 

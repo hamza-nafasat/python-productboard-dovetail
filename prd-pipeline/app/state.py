@@ -25,6 +25,8 @@ def init_session_state() -> None:
         "step_visited": set(),  # type: ignore[typeddict-unknown-key]
         # Data sources
         "selected_dovetail_project_ids": [],
+        "selected_dovetail_insight_ids": [],
+        "dovetail_insights": [],  # insights for selected projects only (cached after Load insights)
         "selected_productboard_ids": [],  # features or notes IDs
         "filters": {"tags": [], "date_from": "", "date_to": "", "priority": ""},
         "dovetail_projects": [],

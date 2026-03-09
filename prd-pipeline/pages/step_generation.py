@@ -5,7 +5,7 @@ from typing import Any
 
 import streamlit as st
 
-from app.state import get_api_config, next_step
+from app.state import get_api_config
 from core.models import APIConfig, PromptConfig
 from core.prd_generator import run_pipeline
 
@@ -53,6 +53,7 @@ def _run(payload: dict[str, Any]) -> None:
             api_config=api_config,
             prompt_config=prompt_config,
             selected_dovetail_project_ids=payload.get("selected_dovetail_project_ids", []),
+            selected_dovetail_insight_ids=payload.get("selected_dovetail_insight_ids", []),
             selected_productboard_ids=payload.get("selected_productboard_ids", []),
             log_callback=_log_cb,
         )
@@ -128,6 +129,7 @@ def render_step_generation() -> None:
                 "output_tone": snap.get("output_tone", "professional"),
                 "include_roadmap": snap.get("include_roadmap", True),
                 "selected_dovetail_project_ids": st.session_state.get("selected_dovetail_project_ids", []),
+                "selected_dovetail_insight_ids": st.session_state.get("selected_dovetail_insight_ids", []),
                 "selected_productboard_ids": st.session_state.get("selected_productboard_ids", []),
             }
         else:
@@ -141,6 +143,7 @@ def render_step_generation() -> None:
                 "output_tone": st.session_state.get("output_tone", "professional"),
                 "include_roadmap": st.session_state.get("include_roadmap", True),
                 "selected_dovetail_project_ids": st.session_state.get("selected_dovetail_project_ids", []),
+                "selected_dovetail_insight_ids": st.session_state.get("selected_dovetail_insight_ids", []),
                 "selected_productboard_ids": st.session_state.get("selected_productboard_ids", []),
             }
             st.session_state.generation_prompt_config_snapshot = {
@@ -233,6 +236,5 @@ def render_step_generation() -> None:
         st.caption("Select all text above and copy (Ctrl+A, Ctrl+C or Cmd+A, Cmd+C) to paste into your AI tool.")
 
         st.divider()
-        if st.button("Next: History & Audit →", type="primary"):
-            next_step()
+        if st.button("Done", type="primary"):
             st.rerun()
