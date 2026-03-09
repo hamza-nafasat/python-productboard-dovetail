@@ -233,6 +233,6 @@ def render_step_generation() -> None:
         st.caption("Select all text above and copy (Ctrl+A, Ctrl+C or Cmd+A, Cmd+C) to paste into your AI tool.")
 
         st.divider()
-        if st.button("Next: PRD Review →", type="primary"):
+        if st.button("Next: History & Audit →", type="primary"):
             next_step()
             st.rerun()

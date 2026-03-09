@@ -73,11 +73,8 @@ try:
         from pages.step_generation import render_step_generation
         render_step_generation()
     elif step == 5:
-        from pages.step_review import render_step_review
-        render_step_review()
-    elif step == 6:
-        from pages.step_publish import render_step_publish
-        render_step_publish()
+        from pages.step_history import render_step_history
+        render_step_history()
     else:
         from pages.step_history import render_step_history
         render_step_history()

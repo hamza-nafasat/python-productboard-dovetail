@@ -39,8 +39,6 @@ def add_entry(
     selected_dovetail_ids: Optional[list[str]] = None,
     selected_productboard_ids: Optional[list[str]] = None,
     prompt_config_snapshot: Optional[dict[str, Any]] = None,
-    confluence_page_id: Optional[str] = None,
-    confluence_url: Optional[str] = None,
 ) -> str:
     """Append a PRD to history. Returns the new entry id."""
     entries = _load_all()
@@ -55,8 +53,6 @@ def add_entry(
         "selected_dovetail_ids": selected_dovetail_ids or [],
         "selected_productboard_ids": selected_productboard_ids or [],
         "prompt_config_snapshot": prompt_config_snapshot or {},
-        "confluence_page_id": confluence_page_id,
-        "confluence_url": confluence_url,
     }
     entries.append(entry)
     _save_all(entries)
@@ -76,15 +72,3 @@ def get_entry(entry_id: str) -> Optional[dict[str, Any]]:
         if e.get("id") == entry_id:
             return e
     return None
-
-
-def update_entry_confluence(entry_id: str, page_id: str, url: str) -> bool:
-    """Update an entry with Confluence publish info."""
-    entries = _load_all()
-    for e in entries:
-        if e.get("id") == entry_id:
-            e["confluence_page_id"] = page_id
-            e["confluence_url"] = url
-            _save_all(entries)
-            return True
-    return False

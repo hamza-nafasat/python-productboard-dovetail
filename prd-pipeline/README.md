@@ -6,14 +6,11 @@ This folder is the main **PRD Generation Pipeline** app. For a full **project ov
 
 ## What this app does
 
-- **Step 1 – Setup**: Enter Dovetail, Productboard, and Confluence API keys; test connections.
+- **Step 1 – Setup**: Enter Dovetail and Productboard API keys; test connections.
 - **Step 2 – Data sources**: Select which Dovetail projects and Productboard features/notes to use.
 - **Step 3 – Prompt config**: Set product context, business goals, constraints, audience, tone, and roadmap option. Config is saved when you go to Step 4 so it stays visible after “Refresh status”.
 - **Step 4 – Generate PRD prompt**: Runs a pipeline that fetches your selected data, builds one combined prompt (your config + Dovetail summary + Productboard summary). You click “Refresh status” when done, then **copy the prompt into your own AI tool** (e.g. ChatGPT, Claude) to generate the PRD. The app does not call an LLM.
-- **Step 5 – PRD review**: Paste the PRD from your AI tool, edit in the app, compare versions.
-- **Step 6 – Publish**: Publish the current PRD to Confluence (parent page, title, space).
-
-History is available from the sidebar (local JSON store).
+- **Step 5 – History & Audit**: View past PRDs and metadata (stored locally), download Markdown.
 
 ---
 
@@ -69,11 +66,11 @@ Then open the URL shown (default: http://localhost:8501).
 | Path | Purpose |
 |------|--------|
 | `app/` | Entry point (`main.py`), config, session state, optional API server |
-| `api/` | Dovetail, Productboard, Confluence API clients |
+| `api/` | Dovetail, Productboard API clients |
 | `core/` | Data models, `run_pipeline()` (fetch + summarize + build prompt) |
 | `services/prompt_builder/` | Prompt assembly (strategies, normalizer, config) |
 | `services/history.py` | Local PRD history (JSON) |
-| `pages/` | Wizard steps 1–6 (one file per step) |
+| `pages/` | Wizard steps 1–5 (one file per step) |
 | `ui/` | Sidebar, theme, layout |
 | `components/` | Connection status, forms, markdown editor, etc. |
 | `data/`, `logs/` | Created at runtime |

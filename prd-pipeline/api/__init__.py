@@ -1,1 +1,1 @@
-# API clients for Dovetail, Productboard, Anthropic, Confluence
+# API clients for Dovetail, Productboard

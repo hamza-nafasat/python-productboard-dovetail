@@ -7,21 +7,15 @@ from typing import Any, Optional
 
 @dataclass
 class APIConfig:
-    """API keys and Confluence settings (session-only)."""
+    """API keys (session-only)."""
     dovetail_key: str = ""
     productboard_key: str = ""
-    confluence_key: str = ""
-    confluence_base_url: str = ""
-    confluence_space: str = ""
 
     @classmethod
     def from_session_dict(cls, d: dict[str, Any]) -> "APIConfig":
         return cls(
             dovetail_key=d.get("dovetail_key", "") or "",
             productboard_key=d.get("productboard_key", "") or "",
-            confluence_key=d.get("confluence_key", "") or "",
-            confluence_base_url=d.get("confluence_base_url", "") or "",
-            confluence_space=d.get("confluence_space", "") or "",
         )
 
 
@@ -58,5 +52,3 @@ class PRDHistoryEntry:
     selected_dovetail_ids: list[str] = field(default_factory=list)
     selected_productboard_ids: list[str] = field(default_factory=list)
     prompt_config_snapshot: dict[str, Any] = field(default_factory=dict)
-    confluence_page_id: Optional[str] = None
-    confluence_url: Optional[str] = None

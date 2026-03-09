@@ -15,9 +15,6 @@ def init_session_state() -> None:
         "api_config": {
             "dovetail_key": "",
             "productboard_key": "",
-            "confluence_key": "",
-            "confluence_base_url": "",
-            "confluence_space": "",
         },
         # Connection test results: { "dovetail": True, "productboard": False, ... }
         "connection_status": {},
@@ -48,13 +45,7 @@ def init_session_state() -> None:
         "generated_prompt": "",
         "generated_prompt_metadata": {},
         "generation_prompt_config_snapshot": None,  # prompt config used for current run (persists on step 4 when widget keys are not rendered)
-        "current_prd_text": "",
-        "current_prd_version": 1,
         "pipeline_run_id": None,
-        "prd_versions": [],  # list of {"version": int, "text": str} for comparison
-        # Publish
-        "confluence_parent_page_id": "",
-        "confluence_page_title": "",
         # Theme
         "dark_mode": False,
     }
@@ -73,12 +64,6 @@ def init_session_state() -> None:
                 api_cfg["dovetail_key"] = str(secrets.get("DOVETAIL_API_KEY") or "")
             if not api_cfg.get("productboard_key") and "PRODUCTBOARD_API_KEY" in secrets:
                 api_cfg["productboard_key"] = str(secrets.get("PRODUCTBOARD_API_KEY") or "")
-            if not api_cfg.get("confluence_key") and "CONFLUENCE_API_KEY" in secrets:
-                api_cfg["confluence_key"] = str(secrets.get("CONFLUENCE_API_KEY") or "")
-            if not api_cfg.get("confluence_base_url") and "CONFLUENCE_BASE_URL" in secrets:
-                api_cfg["confluence_base_url"] = str(secrets.get("CONFLUENCE_BASE_URL") or "")
-            if not api_cfg.get("confluence_space") and "CONFLUENCE_SPACE" in secrets:
-                api_cfg["confluence_space"] = str(secrets.get("CONFLUENCE_SPACE") or "")
             st.session_state.api_config = api_cfg
     except Exception:
         # No secrets file, or StreamlitSecretNotFoundError: run without prefilled keys
