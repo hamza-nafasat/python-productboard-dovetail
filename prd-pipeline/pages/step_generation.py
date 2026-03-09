@@ -7,7 +7,7 @@ import streamlit as st
 
 from app.state import get_api_config
 from core.models import APIConfig, PromptConfig
-from core.prd_generator import run_pipeline
+from core.prd_generator import build_prompt_from_context, run_pipeline
 
 logger = logging.getLogger(__name__)
 _executor = ThreadPoolExecutor(max_workers=1)
@@ -39,7 +39,6 @@ def _run(payload: dict[str, Any]) -> None:
     _generation_metadata.clear()
     _generation_metadata.append({})
     try:
-        api_config = APIConfig.from_session_dict(payload["api_config"])
         prompt_config = PromptConfig(
             prd_template_id=payload.get("prd_template_id", "default"),
             product_context=payload.get("product_context", ""),
@@ -49,14 +48,25 @@ def _run(payload: dict[str, Any]) -> None:
             output_tone=payload.get("output_tone", "professional"),
             include_roadmap=payload.get("include_roadmap", True),
         )
-        prompt_text, err, run_id, metadata = run_pipeline(
-            api_config=api_config,
-            prompt_config=prompt_config,
-            selected_dovetail_project_ids=payload.get("selected_dovetail_project_ids", []),
-            selected_dovetail_insight_ids=payload.get("selected_dovetail_insight_ids", []),
-            selected_productboard_ids=payload.get("selected_productboard_ids", []),
-            log_callback=_log_cb,
-        )
+        context_data = payload.get("context_data")
+        if context_data:
+            prompt_text, err, run_id, metadata = build_prompt_from_context(
+                context_data=context_data,
+                selected_dovetail_insight_ids=payload.get("selected_dovetail_insight_ids", []),
+                selected_productboard_product_ids=payload.get("selected_productboard_product_ids", []),
+                prompt_config=prompt_config,
+                log_callback=_log_cb,
+            )
+        else:
+            api_config = APIConfig.from_session_dict(payload["api_config"])
+            prompt_text, err, run_id, metadata = run_pipeline(
+                api_config=api_config,
+                prompt_config=prompt_config,
+                selected_dovetail_project_ids=payload.get("selected_dovetail_project_ids", []),
+                selected_dovetail_insight_ids=payload.get("selected_dovetail_insight_ids", []),
+                selected_productboard_ids=payload.get("selected_productboard_ids", []),
+                log_callback=_log_cb,
+            )
         _generation_done.append(True)
         _generation_run_id.append(run_id)
         if err:
@@ -128,9 +138,11 @@ def render_step_generation() -> None:
                 "audience_type": snap.get("audience_type", "internal_stakeholders"),
                 "output_tone": snap.get("output_tone", "professional"),
                 "include_roadmap": snap.get("include_roadmap", True),
+                "context_data": st.session_state.get("context_data"),
                 "selected_dovetail_project_ids": st.session_state.get("selected_dovetail_project_ids", []),
                 "selected_dovetail_insight_ids": st.session_state.get("selected_dovetail_insight_ids", []),
                 "selected_productboard_ids": st.session_state.get("selected_productboard_ids", []),
+                "selected_productboard_product_ids": st.session_state.get("selected_productboard_product_ids", []),
             }
         else:
             payload = {
@@ -142,9 +154,11 @@ def render_step_generation() -> None:
                 "audience_type": st.session_state.get("audience_type", "internal_stakeholders"),
                 "output_tone": st.session_state.get("output_tone", "professional"),
                 "include_roadmap": st.session_state.get("include_roadmap", True),
+                "context_data": st.session_state.get("context_data"),
                 "selected_dovetail_project_ids": st.session_state.get("selected_dovetail_project_ids", []),
                 "selected_dovetail_insight_ids": st.session_state.get("selected_dovetail_insight_ids", []),
                 "selected_productboard_ids": st.session_state.get("selected_productboard_ids", []),
+                "selected_productboard_product_ids": st.session_state.get("selected_productboard_product_ids", []),
             }
             st.session_state.generation_prompt_config_snapshot = {
                 "prd_template_id": payload.get("prd_template_id", "default"),
@@ -172,7 +186,7 @@ def render_step_generation() -> None:
         st.rerun()
 
     if running:
-        st.info("Generating prompt… Fetching data and building prompt. Click **Refresh status** to update.")
+        st.info("Generating prompt… Building from your selected data and config. Click **Refresh status** to update.")
         if st.button("Refresh status", key="refresh_gen"):
             # Restore prompt config from snapshot (session state keys can be removed when step 3 widgets aren't rendered)
             snapshot = _get_prompt_config_snapshot()

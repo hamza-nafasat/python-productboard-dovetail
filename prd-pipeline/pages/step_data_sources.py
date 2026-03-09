@@ -1,161 +1,112 @@
-"""Step 2: Data source selection - Dovetail projects/insights, Productboard features/notes."""
+"""Step 2: Context Selection — load Dovetail + Productboard in parallel, select insights and products."""
+from __future__ import annotations
+
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import streamlit as st
 
-from api import dovetail, productboard
 from app.state import get_api_config, next_step
-from components.data_preview import count_cards, table_from_dicts
 from components.loading import with_spinner
+from services.context_data import fetch_context_data
 
 logger = logging.getLogger(__name__)
 
 
-def _fetch_dovetail_projects() -> list:
-    cfg = get_api_config()
-    return dovetail.get_projects(cfg.get("dovetail_key", ""))
-
-
-def _fetch_dovetail_insights_for_projects(project_ids: list[str]) -> list:
-    """Fetch insights only for the given project IDs."""
-    cfg = get_api_config()
-    key = cfg.get("dovetail_key", "")
-    if not key or not project_ids:
-        return []
-    insights: list = []
-    for pid in project_ids:
-        project_insights = dovetail.get_insights(key, project_id=pid)
-        for ins in project_insights:
-            ins = dict(ins)
-            ins.setdefault("project_id", pid)
-            insights.append(ins)
-    return insights
-
-
-def _fetch_productboard() -> tuple[list, list]:
-    cfg = get_api_config()
-    features = productboard.get_features(cfg.get("productboard_key", ""))
-    notes = productboard.get_notes(cfg.get("productboard_key", ""))
-    return features, notes
-
-
 def render_step_data_sources() -> None:
-    st.header("Step 2: Data Source Selection")
-    st.caption("Select Dovetail projects, then choose which insights to include. Select Productboard items in the second tab.")
+    st.header("Step 2: Context Selection")
+    st.caption(
+        "Load Dovetail projects & insights and Productboard products in one go. "
+        "Select insights and products, then go to Prompt Config and Generate PRD."
+    )
 
     cfg = get_api_config()
-    if not cfg.get("dovetail_key") and not cfg.get("productboard_key"):
+    if not (cfg.get("dovetail_key") or "").strip() and not (cfg.get("productboard_key") or "").strip():
         st.warning("Configure API keys in Step 1 first.")
         return
 
-    tab1, tab2, tab3 = st.tabs(["Dovetail (Projects & Insights)", "Productboard", "Summary"])
-
-    with tab1:
-        if st.button("Fetch Dovetail projects", key="fetch_dovetail"):
-            with with_spinner("Fetching projects..."):
-                projects = _fetch_dovetail_projects()
-            st.session_state.dovetail_projects = projects
-            st.session_state.data_sources_loaded = True
-            st.session_state.dovetail_insights = []
-            st.rerun()
-
-        projects = st.session_state.get("dovetail_projects", [])
-        if not projects:
-            st.caption("Click 'Fetch Dovetail projects' to load.")
-        else:
-            options = {f"{p.get('name', p.get('title', str(p.get('id', ''))))} ({p.get('id', '')})": str(p.get("id", "")) for p in projects}
-            selected_ids_prev = st.session_state.get("selected_dovetail_project_ids", [])
-            default_labels = [l for l, i in options.items() if i in selected_ids_prev]
-            selected_labels = st.multiselect(
-                "Select project(s)",
-                options=list(options.keys()),
-                default=default_labels,
-                format_func=lambda x: x.title() if isinstance(x, str) else str(x),
-                key="dovetail_multiselect",
+    # ---------- Load context (parallel fetch) ----------
+    if st.button("Load context", type="primary", key="load_context_btn"):
+        with with_spinner("Fetching Dovetail projects, insights, and Productboard products in parallel..."):
+            data = fetch_context_data(
+                cfg.get("dovetail_key", "") or "",
+                cfg.get("productboard_key", "") or "",
             )
-            selected_project_ids = [options[l] for l in selected_labels]
-            st.session_state.selected_dovetail_project_ids = selected_project_ids
+        st.session_state.context_data = data
+        st.session_state.data_sources_loaded = True
+        # Sync legacy keys for pipeline: dovetail_projects from context
+        st.session_state.dovetail_projects = data.get("dovetail", {}).get("projects", [])
+        st.rerun()
 
-            if selected_project_ids:
-                if st.button("Load insights for selected projects", key="load_insights"):
-                    with with_spinner("Fetching insights for selected projects..."):
-                        insights = _fetch_dovetail_insights_for_projects(selected_project_ids)
-                    st.session_state.dovetail_insights = insights
-                    st.rerun()
-
-                insights_list = st.session_state.get("dovetail_insights", [])
-                if insights_list:
-                    insight_options = {}
-                    for ins in insights_list:
-                        name = ins.get("name") or ins.get("title") or "(No title)"
-                        iid = str(ins.get("id", ""))
-                        if iid:
-                            label = f"{name} ({iid})"
-                            insight_options[label] = iid
-                    selected_insight_ids_prev = st.session_state.get("selected_dovetail_insight_ids", [])
-                    default_insight_labels = [l for l, i in insight_options.items() if i in selected_insight_ids_prev]
-                    selected_insight_labels = st.multiselect(
-                        "Select insights to include (only from selected projects above)",
-                        options=list(insight_options.keys()),
-                        default=default_insight_labels,
-                        key="dovetail_insights_multiselect",
-                    )
-                    selected_insight_ids = [insight_options[l] for l in selected_insight_labels]
-                    st.session_state.selected_dovetail_insight_ids = selected_insight_ids
-                    st.metric("Selected insights", len(selected_insight_ids))
-                    table_from_dicts(
-                        [i for i in insights_list if str(i.get("id", "")) in selected_insight_ids][:30],
-                        ["id", "name", "title", "project_id"],
-                        30,
-                    )
-                else:
-                    st.caption("Click 'Load insights for selected projects' to see insights for the selected project(s).")
-            else:
-                st.caption("Select at least one project above, then click 'Load insights for selected projects'.")
-
-    with tab2:
-        if st.button("Fetch Productboard", key="fetch_pb"):
-            with with_spinner("Fetching features and notes..."):
-                features, notes = _fetch_productboard()
-            st.session_state.productboard_items = {"features": features, "notes": notes}
-            st.session_state.data_sources_loaded = True
+    context = st.session_state.get("context_data")
+    if not context:
+        st.info("Click **Load context** to fetch Dovetail and Productboard data.")
+        st.divider()
+        if st.button("Next: Prompt Config →", type="primary"):
+            next_step()
             st.rerun()
+        return
 
-        # productboard_items is a dict {"features": [...], "notes": [...]}; state default is [] so guard against list
-        raw = st.session_state.get("productboard_items", {})
-        data = raw if isinstance(raw, dict) else {}
-        features = data.get("features", [])
-        notes = data.get("notes", [])
-        if features or notes:
-            all_items = [{"id": f.get("id"), "name": f.get("name", f.get("title", "")), "type": "feature"} for f in features]
-            all_items += [{"id": n.get("id"), "name": n.get("name", n.get("title", "")), "type": "note"} for n in notes]
-            options = {f"{x.get('name', '')} ({x.get('type', '')})": str(x.get("id", "")) for x in all_items}
-            selected_ids_prev = st.session_state.get("selected_productboard_ids", [])
-            default_labels_pb = [l for l, i in options.items() if i in selected_ids_prev]
-            selected_labels = st.multiselect(
-                "Select Features/Notes",
-                options=list(options.keys()),
-                default=default_labels_pb,
-                format_func=lambda x: x.title() if isinstance(x, str) else str(x),
-                key="pb_multiselect",
-            )
-            selected_ids = [options[l] for l in selected_labels]
-            st.session_state.selected_productboard_ids = selected_ids
-            count_cards(0, len(selected_ids))
-            if all_items:
-                table_from_dicts(all_items[:30], ["id", "name", "type"], 30)
+    dovetail_data = context.get("dovetail") or {}
+    pb_data = context.get("productboard") or {}
+    projects = dovetail_data.get("projects") or []
+    products = pb_data.get("products") or []
+
+    # ---------- Section 1: Dovetail Research (projects with insights grouped) ----------
+    st.subheader("Section 1 — Dovetail Research")
+    selected_insight_ids: set[str] = set(st.session_state.get("selected_dovetail_insight_ids", []))
+
+    for proj in projects:
+        proj_id = proj.get("id", "")
+        proj_name = proj.get("name", "Unnamed project")
+        insights = proj.get("insights") or []
+        if not insights:
+            st.markdown(f"**{proj_name}**")
+            st.caption("No insights")
+            continue
+        st.markdown(f"**{proj_name}**")
+        for ins in insights:
+            iid = str(ins.get("id", ""))
+            title = ins.get("title", "(No title)")
+            key = f"insight_{iid}"
+            checked = st.checkbox(title, value=(iid in selected_insight_ids), key=key)
+            if checked:
+                selected_insight_ids.add(iid)
+            elif iid in selected_insight_ids:
+                selected_insight_ids.discard(iid)
+        st.caption("")
+
+    st.session_state.selected_dovetail_insight_ids = list(selected_insight_ids)
+    # Derive selected project IDs for pipeline (any project that has a selected insight)
+    selected_project_ids = set()
+    for proj in projects:
+        for ins in proj.get("insights") or []:
+            if str(ins.get("id", "")) in selected_insight_ids:
+                selected_project_ids.add(proj.get("id", ""))
+    st.session_state.selected_dovetail_project_ids = list(selected_project_ids)
+
+    st.divider()
+
+    # ---------- Section 2: Productboard Products ----------
+    st.subheader("Section 2 — Productboard Products")
+    selected_product_ids: list[str] = list(st.session_state.get("selected_productboard_product_ids", []))
+
+    for prod in products:
+        pid = str(prod.get("id", ""))
+        name = prod.get("name", "Unnamed product")
+        key = f"product_{pid}"
+        if st.checkbox(name, value=(pid in selected_product_ids), key=key):
+            if pid not in selected_product_ids:
+                selected_product_ids.append(pid)
         else:
-            st.caption("Click 'Fetch Productboard' to load.")
+            if pid in selected_product_ids:
+                selected_product_ids = [x for x in selected_product_ids if x != pid]
 
-    with tab3:
-        d_ids = st.session_state.get("selected_dovetail_project_ids", [])
-        d_insight_ids = st.session_state.get("selected_dovetail_insight_ids", [])
-        p_ids = st.session_state.get("selected_productboard_ids", [])
-        count_cards(len(d_ids), len(p_ids))
-        st.caption("Selected Dovetail project IDs: " + (", ".join(d_ids) if d_ids else "None"))
-        st.caption("Selected Dovetail insight IDs: " + (", ".join(d_insight_ids) if d_insight_ids else "None"))
-        st.caption("Selected Productboard IDs: " + (", ".join(p_ids) if p_ids else "None"))
+    st.session_state.selected_productboard_product_ids = selected_product_ids
+
+    st.divider()
+    st.caption(
+        f"Selected: {len(selected_insight_ids)} insight(s), {len(selected_product_ids)} product(s)."
+    )
 
     st.divider()
     if st.button("Next: Prompt Config →", type="primary"):

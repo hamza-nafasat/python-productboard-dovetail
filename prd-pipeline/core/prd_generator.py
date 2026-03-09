@@ -1,5 +1,6 @@
 """
 Orchestrates: fetch data from Dovetail/Productboard -> build prompt via prompt_builder -> return prompt + metadata.
+When context_data is provided (from Step 2), builds prompt from that only (no refetch).
 Designed to run in a thread; logs and errors are stored for the UI to read.
 No AI execution; the prompt is for users to run in their own LLM tools.
 """
@@ -14,6 +15,79 @@ from services.prompt_builder import build_prompt
 from services.prompt_builder.models import PromptBuilderConfig, PromptResult
 
 logger = logging.getLogger(__name__)
+
+
+def build_prompt_from_context(
+    context_data: dict[str, Any],
+    selected_dovetail_insight_ids: list[str],
+    selected_productboard_product_ids: list[str],
+    prompt_config: PromptConfig,
+    log_callback: Optional[Callable[[str], None]] = None,
+) -> tuple[str, Optional[str], str, Optional[dict[str, Any]]]:
+    """
+    Build PRD prompt from already-fetched context_data and prompt config. No API calls.
+    Returns (prompt_text, error_message, run_id, metadata).
+    """
+    run_id = str(uuid.uuid4())[:8]
+
+    def log(msg: str) -> None:
+        logger.info("[%s] %s", run_id, msg)
+        if log_callback:
+            log_callback(msg)
+
+    log("Building prompt from selected context (no fetch).")
+    try:
+        dovetail_raw: list[dict[str, Any]] = []
+        projects = (context_data.get("dovetail") or {}).get("projects") or []
+        for proj in projects:
+            for ins in proj.get("insights") or []:
+                iid = str(ins.get("id", ""))
+                if iid in selected_dovetail_insight_ids:
+                    dovetail_raw.append({
+                        "id": iid,
+                        "name": ins.get("title", ""),
+                        "title": ins.get("title", ""),
+                        "body": ins.get("summary", ""),
+                        "content": ins.get("summary", ""),
+                    })
+
+        productboard_raw: list[dict[str, Any]] = []
+        products = (context_data.get("productboard") or {}).get("products") or []
+        for p in products:
+            pid = str(p.get("id", ""))
+            if pid in selected_productboard_product_ids:
+                name = p.get("name", "") or ""
+                productboard_raw.append({
+                    "id": pid,
+                    "name": name,
+                    "title": name,
+                    "content": name,
+                    "description": name,
+                    "kind": "product",
+                })
+
+        log(f"Using {len(dovetail_raw)} insight(s), {len(productboard_raw)} product(s).")
+        builder_config = PromptBuilderConfig(
+            prd_template_id=prompt_config.prd_template_id,
+            product_context=prompt_config.product_context or "",
+            business_goals=prompt_config.business_goals or "",
+            constraints=prompt_config.constraints or "",
+            audience_type=prompt_config.audience_type,
+            output_tone=prompt_config.output_tone,
+            include_roadmap=prompt_config.include_roadmap,
+        )
+        result: PromptResult = build_prompt(
+            dovetail_raw=dovetail_raw,
+            productboard_raw=productboard_raw,
+            config=builder_config,
+        )
+        metadata = result.model_dump()
+        log("Prompt built.")
+        return result.prompt, None, run_id, metadata
+    except Exception as e:
+        err = str(e)
+        log(f"Prompt build error: {err}")
+        return "", err, run_id, None
 
 
 def _summarize_dovetail(projects: list[dict], insights: list[dict]) -> str:

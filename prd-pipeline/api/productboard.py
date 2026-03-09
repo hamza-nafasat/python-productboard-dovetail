@@ -94,6 +94,28 @@ def get_notes(api_key: str) -> list[dict[str, Any]]:
         return []
 
 
+def get_products(api_key: str) -> list[dict[str, Any]]:
+    """Fetch all products from GET /products. Returns list of product dicts with id, name, etc."""
+    if not api_key or not api_key.strip():
+        return []
+    try:
+        with create_client(timeout=HTTP_TIMEOUT) as client:
+            r = client.get(
+                f"{PRODUCTBOARD_BASE}/products",
+                headers=_headers(api_key),
+            )
+            r.raise_for_status()
+            data = r.json()
+        if isinstance(data, dict) and "data" in data:
+            return data["data"] if isinstance(data["data"], list) else []
+        if isinstance(data, list):
+            return data
+        return []
+    except Exception as e:
+        logger.exception("Productboard get_products failed: %s", e)
+        return []
+
+
 def get_areas(api_key: str) -> list[dict[str, Any]]:
     """Fetch product areas if API supports it; otherwise derive from features."""
     # Productboard may expose areas; fallback to features as "areas" for selection

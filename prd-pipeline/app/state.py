@@ -32,6 +32,10 @@ def init_session_state() -> None:
         "dovetail_projects": [],
         "productboard_items": {},  # dict: {"features": [...], "notes": [...]}
         "data_sources_loaded": False,
+        # Context Selection (Step 2): normalized data + selections
+        "context_data": None,  # { dovetail: { projects: [...] }, productboard: { products: [...] } }
+        "selected_productboard_product_ids": [],  # product IDs for PRD prompt
+        "generated_prd_prompt_text": "",  # Claude-style prompt from Step 2
         # Prompt config
         "prd_template_id": "default",
         "product_context": "",
