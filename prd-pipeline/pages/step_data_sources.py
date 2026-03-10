@@ -8,8 +8,9 @@ import streamlit as st
 from app.state import get_api_config, next_step
 from components.loading import with_spinner
 from services.context_data import (
+    fetch_dovetail_projects_only,
     fetch_insights_for_project_ids,
-    fetch_projects_and_products_only,
+    fetch_productboard_notes_only,
 )
 
 logger = logging.getLogger(__name__)
@@ -18,8 +19,8 @@ logger = logging.getLogger(__name__)
 def render_step_data_sources() -> None:
     st.header("Step 2: Context Selection")
     st.caption(
-        "Load Dovetail projects and Productboard notes, then select projects and load their insights. "
-        "Select insights and notes, then go to Prompt Config and Generate PRD."
+        "Use **Tab 1 (Dovetail)** to fetch projects and insights, then **Tab 2 (Productboard)** to fetch and select notes. "
+        "Then go to Step 3."
     )
 
     cfg = get_api_config()
@@ -27,26 +28,14 @@ def render_step_data_sources() -> None:
         st.warning("Configure API keys in Step 1 first.")
         return
 
-    # ---------- Load context (projects + notes only, no Dovetail insights) ----------
-    if st.button("Load context", type="primary", key="load_context_btn"):
-        with with_spinner("Fetching Dovetail projects and Productboard notes..."):
-            data = fetch_projects_and_products_only(
-                cfg.get("dovetail_key", "") or "",
-                cfg.get("productboard_key", "") or "",
-            )
-        st.session_state.context_data = data
-        st.session_state.data_sources_loaded = True
-        st.session_state.dovetail_projects = data.get("dovetail", {}).get("projects", [])
-        st.rerun()
+    # Ensure context_data exists so both tabs can merge their fetch results
+    if st.session_state.get("context_data") is None:
+        st.session_state.context_data = {
+            "dovetail": {"projects": []},
+            "productboard": {"notes": []},
+        }
 
-    context = st.session_state.get("context_data")
-    if not context:
-        st.info("Click **Load context** to fetch Dovetail projects and Productboard notes.")
-        st.divider()
-        if st.button("Next: Prompt Config →", type="primary"):
-            next_step()
-            st.rerun()
-        return
+    context = st.session_state.context_data
 
     # Run insights fetch only once per click (in a dedicated run) to avoid loop/multiple API calls
     pending = st.session_state.pop("pending_insights_load", None)
@@ -67,12 +56,32 @@ def render_step_data_sources() -> None:
     projects = dovetail_data.get("projects") or []
     notes = pb_data.get("notes") or []
 
-    # ---------- Two sections side by side (50% / 50%) with separator ----------
-    col_dovetail, col_sep, col_pb = st.columns([1, 0.03, 1])
+    # Scrollable tab content
+    st.markdown("""
+    <style>
+    /* Scrollable tab content */
+    div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"] {
+        max-height: 65vh;
+        overflow-y: auto;
+        overflow-x: hidden;
+    }
+    div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"]::-webkit-scrollbar { width: 8px; }
+    div[data-testid="stVerticalBlock"] > div[data-testid="stVerticalBlock"]::-webkit-scrollbar-thumb { background: rgba(0,0,0,0.2); border-radius: 4px; }
+    .streamlit-expanderHeader { font-weight: 500; }
+    </style>
+    """, unsafe_allow_html=True)
 
-    with col_dovetail:
-        st.subheader("Dovetail Research")
-        # Project checkboxes (which projects to load insights for)
+    # ---------- Tabs: Dovetail (first) and Productboard (second) ----------
+    tab_dovetail, tab_productboard = st.tabs(["Dovetail Research", "Productboard Notes"])
+
+    with tab_dovetail:
+        st.caption("Fetch Dovetail projects, then select projects and load insights, then pick which insights to include.")
+        if st.button("Fetch Dovetail", type="primary", key="fetch_dovetail_btn"):
+            with with_spinner("Fetching Dovetail projects..."):
+                dovetail_slice = fetch_dovetail_projects_only(cfg.get("dovetail_key", "") or "")
+            st.session_state.context_data.setdefault("dovetail", {})["projects"] = dovetail_slice.get("projects", [])
+            st.rerun()
+        st.markdown("**Projects**")
         selected_for_loading: list[str] = list(st.session_state.get("selected_dovetail_project_ids_for_loading", []))
         for proj in projects:
             proj_id = str(proj.get("id", ""))
@@ -92,6 +101,8 @@ def render_step_data_sources() -> None:
         else:
             st.caption("Select one or more projects above, then click **Load insights for selected project(s)**.")
 
+        st.divider()
+        st.markdown("**Insights**")
         selected_insight_ids: set[str] = set(st.session_state.get("selected_dovetail_insight_ids", []))
         for proj in projects:
             proj_id = proj.get("id", "")
@@ -99,24 +110,23 @@ def render_step_data_sources() -> None:
             insights = proj.get("insights") or []
             if not insights:
                 continue
-            st.markdown(f"**{proj_name}**")
-            for ins in insights:
-                iid = str(ins.get("id", ""))
-                title = ins.get("title", "(No title)")
-                key = f"insight_{iid}"
-                checked = st.checkbox(title, value=(iid in selected_insight_ids), key=key)
-                if checked:
-                    selected_insight_ids.add(iid)
-                elif iid in selected_insight_ids:
-                    selected_insight_ids.discard(iid)
-                if checked:
-                    raw_data = ins.get("raw")
-                    with st.expander("View full insight data (JSON)", expanded=True):
-                        if raw_data is not None:
-                            st.json(raw_data)
-                        else:
-                            st.caption("Full data not available.")
-            st.caption("")
+            with st.expander(f"▸ {proj_name} ({len(insights)} insight(s))", expanded=False, key=f"exp_proj_{proj_id}"):
+                for ins in insights:
+                    iid = str(ins.get("id", ""))
+                    title = ins.get("title", "(No title)")
+                    key = f"insight_{proj_id}_{iid}"
+                    checked = st.checkbox(title, value=(iid in selected_insight_ids), key=key)
+                    if checked:
+                        selected_insight_ids.add(iid)
+                    elif iid in selected_insight_ids:
+                        selected_insight_ids.discard(iid)
+                    if checked:
+                        raw_data = ins.get("raw")
+                        with st.expander("View full data (JSON)", expanded=False, key=f"exp_raw_{proj_id}_{iid}"):
+                            if raw_data is not None:
+                                st.json(raw_data)
+                            else:
+                                st.caption("Full data not available.")
 
         st.session_state.selected_dovetail_insight_ids = list(selected_insight_ids)
         selected_project_ids = set()
@@ -126,14 +136,14 @@ def render_step_data_sources() -> None:
                     selected_project_ids.add(proj.get("id", ""))
         st.session_state.selected_dovetail_project_ids = list(selected_project_ids)
 
-    with col_sep:
-        st.markdown(
-            "<div style='border-left: 2px solid #ccc; min-height: 400px; margin: 0 4px;'></div>",
-            unsafe_allow_html=True,
-        )
-
-    with col_pb:
-        st.subheader("Productboard Notes")
+    with tab_productboard:
+        st.caption("Fetch Productboard notes, then select which notes to include in the PRD context.")
+        if st.button("Fetch Productboard", type="primary", key="fetch_productboard_btn"):
+            with with_spinner("Fetching Productboard notes..."):
+                pb_slice = fetch_productboard_notes_only(cfg.get("productboard_key", "") or "")
+            st.session_state.context_data.setdefault("productboard", {})["notes"] = pb_slice.get("notes", [])
+            st.rerun()
+        st.markdown("**Notes**")
         selected_note_ids: list[str] = list(st.session_state.get("selected_productboard_product_ids", []))
         for note in notes:
             nid = str(note.get("id", ""))
@@ -149,10 +159,8 @@ def render_step_data_sources() -> None:
 
     st.divider()
     st.caption(
-        f"Selected: {len(selected_insight_ids)} insight(s), {len(selected_note_ids)} note(s)."
+        f"**Selected:** {len(selected_insight_ids)} insight(s), {len(selected_note_ids)} note(s)."
     )
-
-    st.divider()
     if st.button("Next: Prompt Config →", type="primary"):
         next_step()
         st.rerun()

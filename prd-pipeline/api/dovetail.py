@@ -131,7 +131,7 @@ def _get_highlights_page(
         )
         r.raise_for_status()
         data = r.json()
-        logger.info("Dovetail highlights API response (project_id=%s): %s", project_id, json.dumps(data, default=str))
+        # logger.info("Dovetail highlights API response (project_id=%s): %s", project_id, json.dumps(data, default=str))
         return _parse_list_response(data)
     except Exception as e:
         logger.warning("Dovetail _get_highlights_page failed for project %s: %s", project_id, e)

@@ -150,6 +150,35 @@ def _normalize_insights_for_project(raw_insights: list[dict]) -> list[dict[str, 
     return out
 
 
+def fetch_dovetail_projects_only(dovetail_key: str) -> dict[str, Any]:
+    """
+    Fetch only Dovetail projects (no insights). Returns dovetail slice for context_data.
+    """
+    if not (dovetail_key or "").strip():
+        return {"projects": []}
+    raw = dovetail.get_projects(dovetail_key)
+    project_list: list[dict[str, Any]] = []
+    for p in raw:
+        if not isinstance(p, dict):
+            continue
+        pid = str(p.get("id", "")).strip()
+        if not pid:
+            continue
+        name = (p.get("name") or p.get("title") or pid).strip()
+        project_list.append({"id": pid, "name": name, "insights": []})
+    return {"projects": project_list}
+
+
+def fetch_productboard_notes_only(productboard_key: str) -> dict[str, Any]:
+    """
+    Fetch only Productboard notes. Returns productboard slice for context_data.
+    """
+    if not (productboard_key or "").strip():
+        return {"notes": []}
+    raw = productboard.get_notes(productboard_key)
+    return _normalize_notes(raw)
+
+
 def fetch_projects_and_products_only(dovetail_key: str, productboard_key: str) -> dict[str, Any]:
     """
     Fetch only Dovetail projects and Productboard notes (no insights).
