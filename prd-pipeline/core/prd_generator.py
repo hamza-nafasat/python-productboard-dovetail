@@ -52,21 +52,21 @@ def build_prompt_from_context(
                     })
 
         productboard_raw: list[dict[str, Any]] = []
-        products = (context_data.get("productboard") or {}).get("products") or []
-        for p in products:
-            pid = str(p.get("id", ""))
-            if pid in selected_productboard_product_ids:
-                name = p.get("name", "") or ""
+        notes = (context_data.get("productboard") or {}).get("notes") or []
+        for n in notes:
+            nid = str(n.get("id", ""))
+            if nid in selected_productboard_product_ids:
+                name = n.get("name", "") or ""
                 productboard_raw.append({
-                    "id": pid,
+                    "id": nid,
                     "name": name,
                     "title": name,
                     "content": name,
                     "description": name,
-                    "kind": "product",
+                    "kind": "note",
                 })
 
-        log(f"Using {len(dovetail_raw)} insight(s), {len(productboard_raw)} product(s).")
+        log(f"Using {len(dovetail_raw)} insight(s), {len(productboard_raw)} note(s).")
         builder_config = PromptBuilderConfig(
             prd_template_id=prompt_config.prd_template_id,
             product_context=prompt_config.product_context or "",

@@ -25,6 +25,8 @@ def init_session_state() -> None:
         "step_visited": set(),  # type: ignore[typeddict-unknown-key]
         # Data sources
         "selected_dovetail_project_ids": [],
+        "selected_dovetail_project_ids_for_loading": [],  # project IDs selected in Step 2 for loading insights
+        "pending_insights_load": None,  # list of project IDs to fetch (set on button click, cleared after fetch)
         "selected_dovetail_insight_ids": [],
         "dovetail_insights": [],  # insights for selected projects only (cached after Load insights)
         "selected_productboard_ids": [],  # features or notes IDs
@@ -33,8 +35,8 @@ def init_session_state() -> None:
         "productboard_items": {},  # dict: {"features": [...], "notes": [...]}
         "data_sources_loaded": False,
         # Context Selection (Step 2): normalized data + selections
-        "context_data": None,  # { dovetail: { projects: [...] }, productboard: { products: [...] } }
-        "selected_productboard_product_ids": [],  # product IDs for PRD prompt
+        "context_data": None,  # { dovetail: { projects: [...] }, productboard: { notes: [...] } }
+        "selected_productboard_product_ids": [],  # Productboard note IDs for PRD prompt (from /notes)
         "generated_prd_prompt_text": "",  # Claude-style prompt from Step 2
         # Prompt config
         "prd_template_id": "default",

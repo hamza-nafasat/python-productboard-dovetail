@@ -1,4 +1,4 @@
-"""Dovetail API client. Projects and insights with cursor pagination and full insight details."""
+"""Dovetail API client. Projects and highlights (insights) with cursor pagination."""
 import json
 import logging
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -13,6 +13,8 @@ logger = logging.getLogger(__name__)
 
 DOVETAIL_BASE = "https://dovetail.com/api/v1"
 PAGE_LIMIT = 100
+# Cap insights per project (load only first N for Step 2)
+MAX_INSIGHTS_PER_PROJECT = 20
 MAX_CONCURRENT_REQUESTS = 5
 
 
@@ -108,6 +110,34 @@ def get_projects(api_key: str) -> list[dict[str, Any]]:
         return all_projects
 
 
+def _get_highlights_page(
+    client: httpx.Client,
+    api_key: str,
+    project_id: str,
+    start_cursor: Optional[str] = None,
+) -> tuple[list[dict[str, Any]], Optional[str]]:
+    """
+    Fetch one page of highlights for a project from GET /v1/highlights?project_id={project_id}.
+    Uses cursor pagination. Returns (items, next_cursor).
+    """
+    params: dict[str, Any] = {"project_id": project_id, "page[limit]": PAGE_LIMIT}
+    if start_cursor:
+        params["page[start_cursor]"] = start_cursor
+    try:
+        r = client.get(
+            f"{DOVETAIL_BASE}/highlights",
+            headers=_headers(api_key),
+            params=params,
+        )
+        r.raise_for_status()
+        data = r.json()
+        logger.info("Dovetail highlights API response (project_id=%s): %s", project_id, json.dumps(data, default=str))
+        return _parse_list_response(data)
+    except Exception as e:
+        logger.warning("Dovetail _get_highlights_page failed for project %s: %s", project_id, e)
+        return [], None
+
+
 def _get_insights_page(
     client: httpx.Client,
     api_key: str,
@@ -115,69 +145,53 @@ def _get_insights_page(
     start_cursor: Optional[str] = None,
 ) -> tuple[list[dict[str, Any]], Optional[str]]:
     """
-    Fetch one page of insights for a project.
-    Tries GET /v1/projects/{project_id}/insights first; falls back to GET /v1/insights with filter.
+    Fetch one page of insights (highlights) for a project.
+    Uses GET /v1/highlights?project_id={project_id} per Dovetail API.
     """
-    params: dict[str, Any] = {"page[limit]": PAGE_LIMIT}
-    if start_cursor:
-        params["page[start_cursor]"] = start_cursor
-    url = f"{DOVETAIL_BASE}/projects/{project_id}/insights"
-    try:
-        r = client.get(url, headers=_headers(api_key), params=params)
-        r.raise_for_status()
-        data = r.json()
-        return _parse_list_response(data)
-    except httpx.HTTPStatusError as e:
-        if e.response.status_code == 404:
-            url = f"{DOVETAIL_BASE}/insights"
-            params["filter[project_id]"] = project_id
-            try:
-                r = client.get(url, headers=_headers(api_key), params=params)
-                r.raise_for_status()
-                return _parse_list_response(r.json())
-            except Exception as e2:
-                logger.warning("Dovetail insights fallback failed for project %s: %s", project_id, e2)
-                return [], None
-        raise
-    except Exception as e:
-        logger.warning("Dovetail _get_insights_page failed for project %s: %s", project_id, e)
-        return [], None
+    return _get_highlights_page(client, api_key, project_id, start_cursor)
 
 
 def get_all_insights(api_key: str, page_size: int = 100) -> list[dict[str, Any]]:
     """
-    Fetch ALL insights from GET /v1/insights with cursor pagination (no per-project N+1).
-    Use page[size]=page_size and next_cursor until no more pages. Returns list of insight dicts.
+    Fetch all insights (highlights) by project. Uses GET /v1/highlights?project_id={id} per project
+    (no single "all highlights" endpoint). Returns combined list with project_id set on each item.
     """
     if not api_key or not api_key.strip():
         return []
-    all_insights: list[dict[str, Any]] = []
-    start_cursor: Optional[str] = None
-    limit = min(max(1, page_size), PAGE_LIMIT)
+    projects = get_projects(api_key)
+    if not projects:
+        return []
+    all_items: list[dict[str, Any]] = []
     try:
         with create_client(timeout=HTTP_TIMEOUT) as client:
-            while True:
-                params: dict[str, Any] = {"page[limit]": limit}
-                if start_cursor:
-                    params["page[start_cursor]"] = start_cursor
-                r = client.get(
-                    f"{DOVETAIL_BASE}/insights",
-                    headers=_headers(api_key),
-                    params=params,
-                )
-                r.raise_for_status()
-                data = r.json()
-                items, next_cursor = _parse_list_response(data)
-                for ins in items:
-                    if isinstance(ins, dict):
-                        all_insights.append(dict(ins))
-                if not next_cursor:
-                    break
-                start_cursor = next_cursor
-        return all_insights
+            for p in projects:
+                pid = p.get("id")
+                if pid is None or str(pid).strip() == "":
+                    continue
+                pid = str(pid).strip()
+                start_cursor: Optional[str] = None
+                while True:
+                    items, next_cursor = _get_highlights_page(client, api_key, pid, start_cursor)
+                    for ins in items:
+                        if isinstance(ins, dict):
+                            rec = dict(ins)
+                            rec.setdefault("project_id", pid)
+                            all_items.append(rec)
+                    if not next_cursor:
+                        break
+                    start_cursor = next_cursor
+        return all_items
     except Exception as e:
-        logger.exception("Dovetail get_all_insights failed: %s", e)
-        return all_insights
+        logger.exception("Dovetail get_all_insights (highlights by project) failed: %s", e)
+        return all_items
+
+
+def get_highlights(api_key: str, project_id: str) -> list[dict[str, Any]]:
+    """
+    Fetch all highlights for a project from GET /v1/highlights?project_id={project_id}.
+    Uses cursor pagination. Returns list of highlight dicts (exposed as 'insights' in the app).
+    """
+    return get_insights(api_key, project_id=project_id)
 
 
 def get_insights(
@@ -187,8 +201,9 @@ def get_insights(
     page: int = 1,
 ) -> list[dict[str, Any]]:
     """
-    Fetch insights with pagination. If project_id is given, uses project-scoped endpoint and
-    cursor pagination until no more pages. Returns list of insight dicts (list view; not full details).
+    Fetch insights (highlights) with pagination. If project_id is given, uses
+    GET /v1/highlights?project_id={project_id} with cursor pagination until no more pages.
+    Returns list of highlight/insight dicts with project_id set.
     """
     if not api_key or not api_key.strip():
         return []
@@ -205,9 +220,11 @@ def get_insights(
                         ins = dict(ins)
                         ins.setdefault("project_id", project_id)
                         all_insights.append(ins)
-                if not next_cursor:
+                if not next_cursor or len(all_insights) >= MAX_INSIGHTS_PER_PROJECT:
                     break
                 start_cursor = next_cursor
+        if len(all_insights) >= MAX_INSIGHTS_PER_PROJECT:
+            logger.info("Dovetail get_insights for project %s capped at %s insights.", project_id, MAX_INSIGHTS_PER_PROJECT)
         return all_insights
     except Exception as e:
         logger.exception("Dovetail get_insights for project %s failed: %s", project_id, e)
@@ -229,6 +246,7 @@ def get_insight(api_key: str, insight_id: str) -> Optional[dict[str, Any]]:
             )
             r.raise_for_status()
             data = r.json()
+            logger.info("Dovetail insight API response (insight_id=%s): %s", insight_id, json.dumps(data, default=str))
             if isinstance(data, dict) and "data" in data:
                 return dict(data["data"]) if isinstance(data["data"], dict) else None
             return dict(data) if isinstance(data, dict) else None
@@ -242,11 +260,8 @@ def get_insight(api_key: str, insight_id: str) -> Optional[dict[str, Any]]:
 
 def sync_dovetail_projects(api_key: str) -> dict[str, Any]:
     """
-    Fetch all projects and all insights with full details in the correct order:
-    1. Fetch ALL projects (GET /v1/projects) with cursor pagination.
-    2. For each project, fetch all insights (GET /v1/projects/{project_id}/insights) with pagination.
-    3. For each insight, fetch full details (GET /v1/insights/{insight_id}) with max 5 concurrent requests.
-    Returns structure: { "projects": [ { "id", "name", "insights": [ { "id", "title", "details": {...} } ] } ] }
+    Fetch all projects, then for each project fetch highlights (GET /v1/highlights?project_id=...),
+    then fetch full insight details per item. Returns structure with projects and nested insights.
     """
     result: dict[str, Any] = {"projects": []}
     if not api_key or not api_key.strip():

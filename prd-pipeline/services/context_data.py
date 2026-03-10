@@ -1,5 +1,5 @@
 """
-Context data layer: parallel fetch of Dovetail (projects + insights) and Productboard (products),
+Context data layer: parallel fetch of Dovetail (projects + insights) and Productboard (notes),
 with a unified normalized structure. API logic is separate from UI.
 """
 from __future__ import annotations
@@ -98,18 +98,155 @@ def _normalize_productboard(products: list[dict]) -> dict[str, Any]:
     return {"products": out}
 
 
+def _normalize_notes(notes: list[dict]) -> dict[str, Any]:
+    """Normalize Productboard notes to { id, name } for list display. Uses content/title."""
+    out = []
+    for n in notes:
+        if not isinstance(n, dict):
+            continue
+        nid = n.get("id")
+        if nid is None:
+            continue
+        name = (n.get("title") or n.get("name") or "")
+        if not name and n.get("content"):
+            raw = n["content"]
+            if isinstance(raw, str):
+                name = raw[:80].strip() + ("..." if len(raw) > 80 else "")
+            elif isinstance(raw, dict) and raw.get("body"):
+                name = str(raw["body"])[:80].strip() + ("..." if len(str(raw.get("body", ""))) > 80 else "")
+        name = (name or str(nid)).strip()
+        out.append({"id": str(nid), "name": name})
+    return {"notes": out}
+
+
+def _normalize_insights_for_project(raw_insights: list[dict]) -> list[dict[str, Any]]:
+    """Convert raw insight/highlight dicts to { id, title, summary, raw }.
+    Title is from tags[].title joined (e.g. "General cost, Utilization") or truncated text if no tags.
+    """
+    out = []
+    for ins in raw_insights:
+        if not isinstance(ins, dict):
+            continue
+        tags = ins.get("tags")
+        if isinstance(tags, list) and tags:
+            titles = []
+            for t in tags:
+                if isinstance(t, dict) and t.get("title"):
+                    titles.append(str(t["title"]).strip())
+            if titles:
+                title = ", ".join(titles)
+            else:
+                text = (ins.get("text") or ins.get("title") or ins.get("name") or "")
+                title = (text.strip()[:100] + "...") if isinstance(text, str) and len(text.strip()) > 100 else (text.strip() or "(No title)")
+        else:
+            text = (ins.get("text") or ins.get("title") or ins.get("name") or "")
+            title = (text.strip()[:100] + "...") if isinstance(text, str) and len(text.strip()) > 100 else (text.strip() or "(No title)")
+        out.append({
+            "id": str(ins.get("id", "")),
+            "title": title,
+            "summary": _insight_summary(ins),
+            "raw": dict(ins),  # full API response for "View full data"
+        })
+    return out
+
+
+def fetch_projects_and_products_only(dovetail_key: str, productboard_key: str) -> dict[str, Any]:
+    """
+    Fetch only Dovetail projects and Productboard notes (no insights).
+    Use this for initial Step 2 load; then call fetch_insights_for_project_ids for selected projects.
+    """
+    result: dict[str, Any] = {
+        "dovetail": {"projects": []},
+        "productboard": {"notes": []},
+    }
+    projects: list[dict] = []
+    notes: list[dict] = []
+
+    def fetch_projects() -> None:
+        nonlocal projects
+        if dovetail_key and dovetail_key.strip():
+            projects = dovetail.get_projects(dovetail_key)
+
+    def fetch_notes() -> None:
+        nonlocal notes
+        if productboard_key and productboard_key.strip():
+            notes = productboard.get_notes(productboard_key)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [
+            executor.submit(fetch_projects),
+            executor.submit(fetch_notes),
+        ]
+        for f in as_completed(futures):
+            try:
+                f.result()
+            except Exception as e:
+                logger.warning("Context fetch task failed: %s", e)
+
+    # Dovetail: projects with empty insights
+    project_list: list[dict[str, Any]] = []
+    for p in projects:
+        if not isinstance(p, dict):
+            continue
+        pid = str(p.get("id", "")).strip()
+        if not pid:
+            continue
+        name = (p.get("name") or p.get("title") or pid).strip()
+        project_list.append({"id": pid, "name": name, "insights": []})
+    result["dovetail"] = {"projects": project_list}
+    result["productboard"] = _normalize_notes(notes)
+    return result
+
+
+def fetch_insights_for_project_ids(dovetail_key: str, project_ids: list[str]) -> dict[str, list[dict[str, Any]]]:
+    """
+    Fetch highlights/insights only for the given Dovetail project IDs (in parallel).
+    Returns mapping project_id -> list of normalized insights { id, title, summary }.
+    """
+    if not dovetail_key or not dovetail_key.strip() or not project_ids:
+        return {}
+
+    result: dict[str, list[dict[str, Any]]] = {}
+    # Deduplicate so we never fetch the same project twice
+    seen: set[str] = set()
+    unique_ids: list[str] = []
+    for pid in project_ids:
+        p = str(pid).strip()
+        if p and p not in seen:
+            seen.add(p)
+            unique_ids.append(p)
+    project_ids = unique_ids
+
+    def fetch_one(pid: str) -> tuple[str, list[dict[str, Any]]]:
+        raw = dovetail.get_insights(dovetail_key, project_id=pid)
+        return pid, _normalize_insights_for_project(raw)
+
+    with ThreadPoolExecutor(max_workers=min(len(project_ids), 5)) as executor:
+        future_to_pid = {executor.submit(fetch_one, pid): pid for pid in project_ids}
+        for f in as_completed(future_to_pid):
+            pid = future_to_pid[f]
+            try:
+                _, insights = f.result()
+                result[pid] = insights
+            except Exception as e:
+                logger.warning("Fetch insights for project %s failed: %s", pid, e)
+                result[pid] = []
+
+    return result
+
+
 def fetch_context_data(dovetail_key: str, productboard_key: str) -> dict[str, Any]:
     """
-    Fetch all context in parallel (Dovetail projects, Dovetail insights, Productboard products),
+    Fetch all context in parallel (Dovetail projects, Dovetail insights, Productboard notes),
     then normalize into a unified structure. Avoids N+1 by fetching all insights once.
     """
     result: dict[str, Any] = {
         "dovetail": {"projects": []},
-        "productboard": {"products": []},
+        "productboard": {"notes": []},
     }
     projects: list[dict] = []
     insights: list[dict] = []
-    products: list[dict] = []
+    notes: list[dict] = []
 
     def fetch_projects() -> None:
         nonlocal projects
@@ -121,16 +258,16 @@ def fetch_context_data(dovetail_key: str, productboard_key: str) -> dict[str, An
         if dovetail_key and dovetail_key.strip():
             insights = dovetail.get_all_insights(dovetail_key, page_size=100)
 
-    def fetch_products() -> None:
-        nonlocal products
+    def fetch_notes() -> None:
+        nonlocal notes
         if productboard_key and productboard_key.strip():
-            products = productboard.get_products(productboard_key)
+            notes = productboard.get_notes(productboard_key)
 
     with ThreadPoolExecutor(max_workers=3) as executor:
         futures = [
             executor.submit(fetch_projects),
             executor.submit(fetch_insights),
-            executor.submit(fetch_products),
+            executor.submit(fetch_notes),
         ]
         for f in as_completed(futures):
             try:
@@ -139,7 +276,7 @@ def fetch_context_data(dovetail_key: str, productboard_key: str) -> dict[str, An
                 logger.warning("Context fetch task failed: %s", e)
 
     result["dovetail"] = _normalize_dovetail(projects, insights)
-    result["productboard"] = _normalize_productboard(products)
+    result["productboard"] = _normalize_notes(notes)
     return result
 
 
