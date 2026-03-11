@@ -22,7 +22,6 @@ def render_step_data_sources() -> None:
         "Use **Tab 1 (Dovetail)** to fetch projects and insights, then **Tab 2 (Productboard)** to fetch and select notes. "
         "Then go to Step 3."
     )
-
     cfg = get_api_config()
     if not (cfg.get("dovetail_key") or "").strip() and not (cfg.get("productboard_key") or "").strip():
         st.warning("Configure API keys in Step 1 first.")
@@ -161,6 +160,6 @@ def render_step_data_sources() -> None:
     st.caption(
         f"**Selected:** {len(selected_insight_ids)} insight(s), {len(selected_note_ids)} note(s)."
     )
-    if st.button("Next: Prompt Config →", type="primary"):
+    if st.button("Next: Generate PRD prompt →", type="primary"):
         next_step()
         st.rerun()

@@ -15,11 +15,10 @@ LOGS_DIR.mkdir(parents=True, exist_ok=True)
 TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
 
 # Wizard
-TOTAL_STEPS = 4
+TOTAL_STEPS = 3
 STEP_NAMES = [
     "Setup",
     "Data Sources",
-    "Prompt Config",
     "Generate PRD prompt",
 ]
 

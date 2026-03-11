@@ -67,9 +67,6 @@ try:
         from pages.step_data_sources import render_step_data_sources
         render_step_data_sources()
     elif step == 3:
-        from pages.step_prompt_config import render_step_prompt_config
-        render_step_prompt_config()
-    elif step == 4:
         from pages.step_generation import render_step_generation
         render_step_generation()
 except Exception as e:

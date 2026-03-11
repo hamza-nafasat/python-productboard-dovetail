@@ -86,27 +86,34 @@ def _get_prompt_config_snapshot() -> dict[str, Any]:
 
 
 def render_step_generation() -> None:
-    st.header("Step 4: Generate PRD prompt")
+    st.header("Step 3: Generate PRD prompt")
     st.caption(
-        "Run the pipeline to build a structured prompt from your data and config. "
+        "Run the pipeline to build a structured prompt from your selected Dovetail insights and Productboard notes. "
         "Copy the prompt into your own AI tool to generate the PRD."
     )
 
-    # Use snapshot if present (config survives here; step 3 widgets are not rendered so their keys can be removed)
+    # No prompt config step: use defaults (empty context/goals/constraints, default tone & roadmap)
     snapshot = _get_prompt_config_snapshot()
-    product_context_display = snapshot.get("product_context") if snapshot else st.session_state.get("product_context", "")
-    business_goals_display = snapshot.get("business_goals") if snapshot else st.session_state.get("business_goals", "")
-    constraints_display = snapshot.get("constraints") if snapshot else st.session_state.get("constraints", "")
+    if not snapshot:
+        # Build default snapshot so generation uses defaults without user config
+        st.session_state.generation_prompt_config_snapshot = {
+            "prd_template_id": st.session_state.get("prd_template_id", "default"),
+            "product_context": st.session_state.get("product_context", ""),
+            "business_goals": st.session_state.get("business_goals", ""),
+            "constraints": st.session_state.get("constraints", ""),
+            "audience_type": st.session_state.get("audience_type", "internal_stakeholders"),
+            "output_tone": st.session_state.get("output_tone", "professional"),
+            "include_roadmap": st.session_state.get("include_roadmap", True),
+        }
+        snapshot = _get_prompt_config_snapshot()
 
-    # Show current prompt configuration so users can see exactly what
-    # will be fed into the prompt builder before generation.
-    with st.expander("Current Prompt Configuration", expanded=False):
-        st.markdown("**Product Context**")
-        st.write(product_context_display or "(empty)")
-        st.markdown("**Business Goals**")
-        st.write(business_goals_display or "(empty)")
-        st.markdown("**Constraints**")
-        st.write(constraints_display or "(empty)")
+    product_context_display = snapshot.get("product_context", "")
+    business_goals_display = snapshot.get("business_goals", "")
+    constraints_display = snapshot.get("constraints", "")
+
+    # Optional: show that we're using default prompt settings (no config step)
+    with st.expander("Prompt settings (defaults)", expanded=False):
+        st.caption("Prompt is built from your selected data with default settings. No custom configuration.")
 
     # Sync session state from worker
     if _generation_logs:
@@ -186,7 +193,7 @@ def render_step_generation() -> None:
         st.rerun()
 
     if running:
-        st.info("Generating prompt… Building from your selected data and config. Click **Refresh status** to update.")
+        st.info("Generating prompt… Building from your selected data. Click **Refresh status** to update.")
         if st.button("Refresh status", key="refresh_gen"):
             # Restore prompt config from snapshot (session state keys can be removed when step 3 widgets aren't rendered)
             snapshot = _get_prompt_config_snapshot()

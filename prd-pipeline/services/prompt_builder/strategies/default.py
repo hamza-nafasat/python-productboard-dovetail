@@ -64,12 +64,6 @@ class DefaultStrategy(PromptStrategy):
 
         user_content = (
             "Use this context to write the PRD:\n\n"
-            "**Product context (problem space)**\n"
-            f"{context}\n\n"
-            "**Business goals**\n"
-            f"{goals}\n\n"
-            "**Constraints**\n"
-            f"{constraints}\n\n"
             "**User research (Dovetail)**\n"
             f"{insights.summary_text}\n\n"
             "**Product feedback (Productboard)**\n"
