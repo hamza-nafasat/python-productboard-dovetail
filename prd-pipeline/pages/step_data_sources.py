@@ -80,9 +80,14 @@ def render_step_data_sources() -> None:
                 dovetail_slice = fetch_dovetail_projects_only(cfg.get("dovetail_key", "") or "")
             st.session_state.context_data.setdefault("dovetail", {})["projects"] = dovetail_slice.get("projects", [])
             st.rerun()
+        dovetail_search = (st.text_input("Search projects", key="dovetail_search", placeholder="Type to filter by name...") or "").strip().lower()
+        if dovetail_search:
+            projects_filtered = [p for p in projects if dovetail_search in (p.get("name") or "").lower()]
+        else:
+            projects_filtered = projects
         st.markdown("**Projects**")
         selected_for_loading: list[str] = list(st.session_state.get("selected_dovetail_project_ids_for_loading", []))
-        for proj in projects:
+        for proj in projects_filtered:
             proj_id = str(proj.get("id", ""))
             proj_name = proj.get("name", "Unnamed project")
             key = f"proj_{proj_id}"
@@ -103,7 +108,7 @@ def render_step_data_sources() -> None:
         st.divider()
         st.markdown("**Insights**")
         selected_insight_ids: set[str] = set(st.session_state.get("selected_dovetail_insight_ids", []))
-        for proj in projects:
+        for proj in projects_filtered:
             proj_id = proj.get("id", "")
             proj_name = proj.get("name", "Unnamed project")
             insights = proj.get("insights") or []
@@ -142,9 +147,18 @@ def render_step_data_sources() -> None:
                 pb_slice = fetch_productboard_notes_only(cfg.get("productboard_key", "") or "")
             st.session_state.context_data.setdefault("productboard", {})["notes"] = pb_slice.get("notes", [])
             st.rerun()
+        pb_search = (st.text_input("Search notes", key="productboard_search", placeholder="Type to filter by name or title...") or "").strip().lower()
+        if pb_search:
+            notes_filtered = [
+                n for n in notes
+                if pb_search in (n.get("name") or "").lower()
+                or (isinstance(n.get("raw"), dict) and pb_search in str((n.get("raw") or {}).get("title", "")).lower())
+            ]
+        else:
+            notes_filtered = notes
         st.markdown("**Notes**")
         selected_note_ids: list[str] = list(st.session_state.get("selected_productboard_product_ids", []))
-        for note in notes:
+        for note in notes_filtered:
             nid = str(note.get("id", ""))
             name = note.get("name", "Unnamed note")
             key = f"note_{nid}"
