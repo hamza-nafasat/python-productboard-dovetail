@@ -8,6 +8,7 @@ handles data quality; strategies handle prompt structure.
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 from typing import Any
 
@@ -82,13 +83,18 @@ def normalize_feedback(
     max_items: int = 20,
     content_max_len: int = 600,
     title_max_len: int = 200,
+    full_json_per_note: bool = True,
 ) -> NormalizedFeedback:
     """
     Clean and deduplicate raw feedback dicts (e.g. from Productboard).
-    Returns normalized items and a summary text block for the prompt.
+    When full_json_per_note is True (default), summary_text includes the full JSON
+    of each note (id, title, content, createdAt, updatedAt, state, displayUrl, tags,
+    company, followers, createdBy, etc.) so the PRD prompt has whole detail.
     """
     seen: set[str] = set()
     items: list[FeedbackItem] = []
+    summary_parts: list[str] = []
+
     for r in raw[: max_items * 2]:
         if not isinstance(r, dict):
             continue
@@ -109,9 +115,18 @@ def normalize_feedback(
                 source="productboard",
             )
         )
+        # Include full note JSON in prompt so the LLM sees id, title, content, createdAt, updatedAt, state, displayUrl, tags, company, followers, createdBy, etc.
+        if full_json_per_note:
+            try:
+                summary_parts.append(json.dumps(r, default=str, indent=2))
+            except (TypeError, ValueError):
+                summary_parts.append(f"- {title}. {content}")
         if len(items) >= max_items:
             break
 
-    lines = [f"- {i.title}. {i.content}" for i in items]
-    summary_text = "\n".join(lines) if lines else "No Productboard feedback selected."
+    if full_json_per_note and summary_parts:
+        summary_text = "\n\n---\n\n".join(summary_parts)
+    else:
+        lines = [f"- {i.title}. {i.content}" for i in items]
+        summary_text = "\n".join(lines) if lines else "No Productboard feedback selected."
     return NormalizedFeedback(items=items, summary_text=summary_text)

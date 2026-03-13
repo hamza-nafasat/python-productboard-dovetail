@@ -148,12 +148,20 @@ def render_step_data_sources() -> None:
             nid = str(note.get("id", ""))
             name = note.get("name", "Unnamed note")
             key = f"note_{nid}"
-            if st.checkbox(name, value=(nid in selected_note_ids), key=key):
+            checked = st.checkbox(name, value=(nid in selected_note_ids), key=key)
+            if checked:
                 if nid not in selected_note_ids:
                     selected_note_ids.append(nid)
             else:
                 if nid in selected_note_ids:
                     selected_note_ids = [x for x in selected_note_ids if x != nid]
+            if checked:
+                raw_data = note.get("raw")
+                with st.expander("View full data (JSON)", expanded=False, key=f"exp_raw_note_{nid}"):
+                    if raw_data is not None:
+                        st.json(raw_data)
+                    else:
+                        st.caption("Full data not available.")
         st.session_state.selected_productboard_product_ids = selected_note_ids
 
     st.divider()

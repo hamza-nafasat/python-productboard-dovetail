@@ -99,7 +99,7 @@ def _normalize_productboard(products: list[dict]) -> dict[str, Any]:
 
 
 def _normalize_notes(notes: list[dict]) -> dict[str, Any]:
-    """Normalize Productboard notes to { id, name } for list display. Uses content/title."""
+    """Normalize Productboard notes to { id, name, raw } for list display and JSON view."""
     out = []
     for n in notes:
         if not isinstance(n, dict):
@@ -115,7 +115,7 @@ def _normalize_notes(notes: list[dict]) -> dict[str, Any]:
             elif isinstance(raw, dict) and raw.get("body"):
                 name = str(raw["body"])[:80].strip() + ("..." if len(str(raw.get("body", ""))) > 80 else "")
         name = (name or str(nid)).strip()
-        out.append({"id": str(nid), "name": name})
+        out.append({"id": str(nid), "name": name, "raw": dict(n)})
     return {"notes": out}
 
 

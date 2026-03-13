@@ -56,15 +56,20 @@ def build_prompt_from_context(
         for n in notes:
             nid = str(n.get("id", ""))
             if nid in selected_productboard_product_ids:
-                name = n.get("name", "") or ""
-                productboard_raw.append({
-                    "id": nid,
-                    "name": name,
-                    "title": name,
-                    "content": name,
-                    "description": name,
-                    "kind": "note",
-                })
+                # Include full note data (id, title, content, createdAt, updatedAt, state, displayUrl, tags, company, followers, createdBy, etc.) so the prompt has whole detail
+                raw_note = n.get("raw")
+                if isinstance(raw_note, dict) and raw_note:
+                    productboard_raw.append(dict(raw_note))
+                else:
+                    name = n.get("name", "") or ""
+                    productboard_raw.append({
+                        "id": nid,
+                        "name": name,
+                        "title": name,
+                        "content": name,
+                        "description": name,
+                        "kind": "note",
+                    })
 
         log(f"Using {len(dovetail_raw)} insight(s), {len(productboard_raw)} note(s).")
         builder_config = PromptBuilderConfig(
