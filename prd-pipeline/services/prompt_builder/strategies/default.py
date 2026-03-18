@@ -50,14 +50,6 @@ class DefaultStrategy(PromptStrategy):
         instruction = (
             "You are an expert product manager. Write a complete, production-ready "
             "Product Requirements Document (PRD) in Markdown.\n\n"
-            "Guidelines:\n"
-            f"- Audience: {audience}. Use a {tone} tone.\n"
-            "- Be specific and actionable. Include clear success criteria where relevant.\n"
-            "- Structure with clear headings (##, ###). Use bullet lists for requirements.\n"
-            "- Base the content on the research and feedback data provided below; do not invent data.\n"
-            "- Output only the PRD Markdown, no meta-commentary.\n\n"
-            "Include these sections: Problem statement, Goals, User personas, "
-            "Requirements, Success metrics, Risks and mitigations, Rollout plan."
         )
         if config.include_roadmap:
             instruction += " Include a high-level Roadmap section at the end with phases and milestones."

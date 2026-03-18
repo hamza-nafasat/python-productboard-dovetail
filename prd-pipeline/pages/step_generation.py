@@ -1,4 +1,5 @@
-"""Step 4: Generate PRD prompt - run pipeline, show prompt with copy and edit."""
+"""Step 3: Generate PRD prompt - run pipeline, show prompt with copy and edit."""
+import io
 import logging
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any
@@ -23,6 +24,43 @@ _generation_metadata: list[dict[str, Any]] = [{}]
 
 def _log_cb(msg: str) -> None:
     _generation_logs.append(msg)
+
+
+def _prompt_to_pdf_bytes(text: str) -> bytes:
+    """Build a PDF from prompt text using reportlab. Returns PDF bytes."""
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.units import inch
+    from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(buf, pagesize=letter, leftMargin=0.75 * inch, rightMargin=0.75 * inch, topMargin=0.75 * inch, bottomMargin=0.75 * inch)
+    styles = getSampleStyleSheet()
+    body_style = ParagraphStyle(
+        "PromptBody",
+        parent=styles["Normal"],
+        fontName="Helvetica",
+        fontSize=10,
+        leading=14,
+        spaceAfter=6,
+    )
+    title_style = ParagraphStyle(
+        "PromptTitle",
+        parent=styles["Heading1"],
+        fontName="Helvetica-Bold",
+        fontSize=14,
+        spaceAfter=12,
+    )
+    story = [Paragraph("PRD Generation Prompt", title_style), Spacer(1, 0.2 * inch)]
+    for line in (text or "").replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+        line = line.strip()
+        if not line:
+            story.append(Spacer(1, 6))
+            continue
+        escaped = line.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        story.append(Paragraph(escaped, body_style))
+    doc.build(story)
+    return buf.getvalue()
 
 
 def _run(payload: dict[str, Any]) -> None:
@@ -255,6 +293,16 @@ def render_step_generation() -> None:
 
         # Copy hint (Streamlit has no built-in copy-to-clipboard for arbitrary text)
         st.caption("Select all text above and copy (Ctrl+A, Ctrl+C or Cmd+A, Cmd+C) to paste into your AI tool.")
+
+        # Download prompt as PDF (uses current content of the text area above)
+        pdf_bytes = _prompt_to_pdf_bytes(edited)
+        st.download_button(
+            "Download prompt as PDF",
+            data=pdf_bytes,
+            file_name="prd_prompt.pdf",
+            mime="application/pdf",
+            key="download_prompt_pdf_btn",
+        )
 
         st.divider()
         if st.button("Done", type="primary"):
